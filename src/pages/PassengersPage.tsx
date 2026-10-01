@@ -5,6 +5,7 @@ import { PassengerForm } from "@/components/passengers/PassengerForm";
 import { Button } from "@/components/ui/button";
 import {
   useCreatePassenger,
+  useDeletePassenger,
   usePassengers,
   useSetPassengerActive,
   useUpdatePassenger,
@@ -17,12 +18,18 @@ export function PassengersPage() {
   const createPassenger = useCreatePassenger();
   const updatePassenger = useUpdatePassenger();
   const setPassengerActive = useSetPassengerActive();
+  const deletePassenger = useDeletePassenger();
 
   const [creating, setCreating] = useState(false);
   const [editingPassenger, setEditingPassenger] = useState<Passenger | null>(
     null,
   );
   const [formError, setFormError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<{
+    id: string;
+    message: string;
+  } | null>(null);
 
   const formOpen = creating || editingPassenger !== null;
   const submitting = createPassenger.isPending || updatePassenger.isPending;
@@ -56,6 +63,23 @@ export function PassengersPage() {
 
   function handleToggleActive(passenger: Passenger) {
     setPassengerActive.mutate({ id: passenger.id, active: !passenger.active });
+  }
+
+  async function handleDelete(passenger: Passenger) {
+    setDeleteError(null);
+    setDeletingId(passenger.id);
+
+    try {
+      await deletePassenger.mutateAsync(passenger.id);
+    } catch (error) {
+      setDeleteError({
+        id: passenger.id,
+        message:
+          error instanceof Error ? error.message : "Não foi possível excluir.",
+      });
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   return (
@@ -99,8 +123,13 @@ export function PassengersPage() {
           <PassengerCard
             key={passenger.id}
             passenger={passenger}
+            deleting={deletingId === passenger.id}
+            deleteError={
+              deleteError?.id === passenger.id ? deleteError.message : null
+            }
             onEdit={setEditingPassenger}
             onToggleActive={handleToggleActive}
+            onDelete={handleDelete}
           />
         ))}
       </div>

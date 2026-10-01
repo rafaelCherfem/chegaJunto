@@ -4,12 +4,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { usePassengers } from "@/hooks/usePassengers";
 import { useCreateRide, useDeleteRide, useRidesByMonth } from "@/hooks/useRides";
-import { currentMonthStart, todayISODate } from "@/utils/date";
+import { referenceMonthFromDate, todayISODate } from "@/utils/date";
 import type { Passenger, Ride } from "@/types/entities";
 
 export function RidesPage() {
   const [selectedDate, setSelectedDate] = useState(todayISODate());
-  const referenceMonth = currentMonthStart();
+  const referenceMonth = referenceMonthFromDate(selectedDate);
 
   const { data: passengers, isLoading: loadingPassengers } = usePassengers();
   const {

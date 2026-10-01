@@ -111,3 +111,41 @@ export async function setPassengerActive(
     throw new Error(errorMessages.unexpected);
   }
 }
+
+export async function deletePassenger(id: string): Promise<void> {
+  const [rides, charges, receivedRides] = await Promise.all([
+    supabase
+      .from("rides")
+      .select("id", { count: "exact", head: true })
+      .eq("passenger_id", id),
+    supabase
+      .from("monthly_charges")
+      .select("id", { count: "exact", head: true })
+      .eq("passenger_id", id),
+    supabase
+      .from("received_rides")
+      .select("id", { count: "exact", head: true })
+      .eq("passenger_id", id),
+  ]);
+
+  if (rides.error || charges.error || receivedRides.error) {
+    throw new Error(errorMessages.unexpected);
+  }
+
+  const hasHistory =
+    (rides.count ?? 0) > 0 ||
+    (charges.count ?? 0) > 0 ||
+    (receivedRides.count ?? 0) > 0;
+
+  if (hasHistory) {
+    throw new Error(
+      "Este passageiro já tem diárias, cobranças ou compensações registradas — exclusão bloqueada. Desative-o em vez disso.",
+    );
+  }
+
+  const { error } = await supabase.from("passengers").delete().eq("id", id);
+
+  if (error) {
+    throw new Error(errorMessages.unexpected);
+  }
+}

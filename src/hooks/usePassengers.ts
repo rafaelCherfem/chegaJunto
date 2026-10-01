@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createPassenger,
+  deletePassenger,
   getPassenger,
   listPassengers,
   setPassengerActive,
@@ -55,6 +56,17 @@ export function useSetPassengerActive() {
   return useMutation({
     mutationFn: ({ id, active }: { id: string; active: boolean }) =>
       setPassengerActive(id, active),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: passengersKey });
+    },
+  });
+}
+
+export function useDeletePassenger() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => deletePassenger(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: passengersKey });
     },

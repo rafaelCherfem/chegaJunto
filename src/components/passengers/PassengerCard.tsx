@@ -1,4 +1,4 @@
-import { Calendar, KeyRound, Pencil, Power, PowerOff } from "lucide-react";
+import { Calendar, KeyRound, Pencil, Power, PowerOff, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { PassengerInvitePanel } from "@/components/passengers/PassengerInvitePanel";
 import { Button } from "@/components/ui/button";
@@ -10,17 +10,24 @@ import type { Passenger } from "@/types/entities";
 
 interface PassengerCardProps {
   passenger: Passenger;
+  deleting: boolean;
+  deleteError: string | null;
   onEdit: (passenger: Passenger) => void;
   onToggleActive: (passenger: Passenger) => void;
+  onDelete: (passenger: Passenger) => void;
 }
 
 export function PassengerCard({
   passenger,
+  deleting,
+  deleteError,
   onEdit,
   onToggleActive,
+  onDelete,
 }: PassengerCardProps) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const referenceMonth = currentMonthStart();
   const { data: rides, isLoading } = usePassengerRides(
     passenger.id,
@@ -87,6 +94,14 @@ export function PassengerCard({
               <Power className="h-4 w-4" />
             )}
           </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setConfirmingDelete((open) => !open)}
+            aria-label="Excluir passageiro"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
@@ -120,6 +135,38 @@ export function PassengerCard({
       )}
 
       {inviteOpen && <PassengerInvitePanel passengerId={passenger.id} />}
+
+      {confirmingDelete && (
+        <div className="mt-3 space-y-2 border-t border-black/10 pt-3">
+          <p className="text-xs">
+            Excluir <strong>{passenger.name}</strong> definitivamente? Só é
+            possível se ele nunca teve diária, cobrança ou compensação
+            registrada.
+          </p>
+
+          {deleteError && (
+            <p className="text-xs text-destructive">{deleteError}</p>
+          )}
+
+          <div className="flex gap-2">
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={deleting}
+              onClick={() => onDelete(passenger)}
+            >
+              {deleting ? "Excluindo..." : "Confirmar exclusão"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setConfirmingDelete(false)}
+            >
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

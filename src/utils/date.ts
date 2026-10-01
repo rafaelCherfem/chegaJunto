@@ -10,6 +10,11 @@ export function currentMonthStart(): string {
   return `${year}-${month}-01`;
 }
 
+export function referenceMonthFromDate(dateISO: string): string {
+  const [year, month] = dateISO.split("-");
+  return `${year}-${month}-01`;
+}
+
 export function formatDateDisplay(dateISO: string): string {
   const [year, month, day] = dateISO.split("-");
   return `${day}/${month}/${year}`;
