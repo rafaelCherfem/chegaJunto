@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { usePrivateMutation } from "@/hooks/usePrivateQuery";
 import { generateMonthlyReceipt } from "@/services/pdf.service";
 import { listRidesByMonth } from "@/services/rides.service";
 import { downloadFile } from "@/utils/downloadFile";
@@ -11,13 +11,13 @@ interface GenerateReceiptInput {
 }
 
 export function useGenerateReceipt() {
-  return useMutation({
-    mutationFn: async ({
-      passenger,
-      charge,
-      referenceMonth,
-    }: GenerateReceiptInput) => {
-      const rides = await listRidesByMonth(referenceMonth, passenger.id);
+  return usePrivateMutation({
+    mutationFn: async (
+      { passenger, charge, referenceMonth }: GenerateReceiptInput,
+      scope,
+    ) => {
+      const rides = await listRidesByMonth(referenceMonth, passenger.id, scope);
+      scope.assertCurrent();
       const bytes = await generateMonthlyReceipt({
         passenger,
         charge,
@@ -25,6 +25,7 @@ export function useGenerateReceipt() {
         referenceMonth,
       });
 
+      scope.assertCurrent();
       const slug = passenger.name.trim().toLowerCase().replace(/\s+/g, "-");
       downloadFile(bytes, `comprovante-${slug}-${referenceMonth}.pdf`, "application/pdf");
     },

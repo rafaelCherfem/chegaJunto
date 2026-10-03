@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { usePrivateQuery, usePrivateMutation } from "@/hooks/usePrivateQuery";
 import {
   createReceivedRide,
   deleteReceivedRide,
@@ -9,30 +9,23 @@ import {
 const receivedRidesKey = ["receivedRides"] as const;
 
 export function useReceivedRidesByMonth(referenceMonth: string) {
-  return useQuery({
+  return usePrivateQuery({
     queryKey: [...receivedRidesKey, referenceMonth],
-    queryFn: () => listReceivedRidesByMonth(referenceMonth),
+    queryFn: (scope) => listReceivedRidesByMonth(referenceMonth, undefined, scope),
   });
 }
 
 export function useCreateReceivedRide() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (input: CreateReceivedRideInput) => createReceivedRide(input),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: receivedRidesKey });
-    },
+  return usePrivateMutation({
+    mutationFn: (input: CreateReceivedRideInput, scope) =>
+      createReceivedRide(input, scope),
+    invalidate: receivedRidesKey,
   });
 }
 
 export function useDeleteReceivedRide() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (id: string) => deleteReceivedRide(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: receivedRidesKey });
-    },
+  return usePrivateMutation({
+    mutationFn: (id: string, scope) => deleteReceivedRide(id, scope),
+    invalidate: receivedRidesKey,
   });
 }

@@ -1,10 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
+import { usePrivateQuery } from "@/hooks/usePrivateQuery";
 import { getMyPassengerAccount } from "@/services/passengerAccounts.service";
 
 export function useMyPassengerAccount() {
-  return useQuery({
+  return usePrivateQuery({
     queryKey: ["myPassengerAccount"],
-    queryFn: getMyPassengerAccount,
-    staleTime: Infinity,
+    queryFn: (scope) => getMyPassengerAccount(scope),
   });
 }

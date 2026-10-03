@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { usePrivateQuery, usePrivateMutation } from "@/hooks/usePrivateQuery";
 import {
   createPassenger,
   deletePassenger,
@@ -13,62 +13,46 @@ import {
 const passengersKey = ["passengers"] as const;
 
 export function usePassengers(includeInactive = false) {
-  return useQuery({
+  return usePrivateQuery({
     queryKey: [...passengersKey, { includeInactive }],
-    queryFn: () => listPassengers(includeInactive),
+    queryFn: (scope) => listPassengers(includeInactive, scope),
   });
 }
 
 export function usePassenger(id: string) {
-  return useQuery({
+  return usePrivateQuery({
     queryKey: [...passengersKey, id],
-    queryFn: () => getPassenger(id),
+    queryFn: (scope) => getPassenger(id, scope),
     enabled: Boolean(id),
   });
 }
 
 export function useCreatePassenger() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (input: CreatePassengerInput) => createPassenger(input),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: passengersKey });
-    },
+  return usePrivateMutation({
+    mutationFn: (input: CreatePassengerInput, scope) => createPassenger(input, scope),
+    invalidate: passengersKey,
   });
 }
 
 export function useUpdatePassenger() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ id, input }: { id: string; input: UpdatePassengerInput }) =>
-      updatePassenger(id, input),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: passengersKey });
-    },
+  return usePrivateMutation({
+    mutationFn: ({ id, input }: { id: string; input: UpdatePassengerInput }, scope) =>
+      updatePassenger(id, input, scope),
+    invalidate: passengersKey,
   });
 }
 
 export function useSetPassengerActive() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ id, active }: { id: string; active: boolean }) =>
-      setPassengerActive(id, active),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: passengersKey });
-    },
+  return usePrivateMutation({
+    mutationFn: ({ id, active }: { id: string; active: boolean }, scope) =>
+      setPassengerActive(id, active, scope),
+    invalidate: passengersKey,
   });
 }
 
 export function useDeletePassenger() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (id: string) => deletePassenger(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: passengersKey });
-    },
+  return usePrivateMutation({
+    mutationFn: (id: string, scope) => deletePassenger(id, scope),
+    invalidate: passengersKey,
   });
 }

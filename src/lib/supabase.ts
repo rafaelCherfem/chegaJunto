@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
+import type { SessionScope } from "@/lib/sessionScope";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -18,10 +19,12 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   },
 });
 
-export async function getCurrentUserId(): Promise<string> {
+export async function getCurrentUserId(scope?: SessionScope): Promise<string> {
+  scope?.assertCurrent();
   const { data, error } = await supabase.auth.getUser();
 
-  if (error || !data.user) {
+  scope?.assertCurrent();
+  if (error || !data.user || (scope && data.user.id !== scope.userId)) {
     throw new Error("Usuário não autenticado.");
   }
 

@@ -1,3 +1,4 @@
+import { requestSignal, type SessionScope } from "@/lib/sessionScope";
 import { addMonths, formatISO } from "date-fns";
 import { errorMessages } from "@/constants/errorMessages";
 import { toReceivedRide } from "@/lib/mappers";
@@ -13,6 +14,7 @@ export interface CreateReceivedRideInput {
 export async function listReceivedRidesByMonth(
   referenceMonth: string,
   passengerId?: string,
+  scope?: SessionScope,
 ): Promise<ReceivedRide[]> {
   const monthStart = referenceMonth;
   const monthEnd = formatISO(addMonths(new Date(referenceMonth), 1), {
@@ -30,7 +32,7 @@ export async function listReceivedRidesByMonth(
     query = query.eq("passenger_id", passengerId);
   }
 
-  const { data, error } = await query;
+  const { data, error } = await query.abortSignal(requestSignal(scope));
 
   if (error) {
     throw new Error(errorMessages.unexpected);
@@ -41,8 +43,9 @@ export async function listReceivedRidesByMonth(
 
 export async function createReceivedRide(
   input: CreateReceivedRideInput,
+  scope?: SessionScope,
 ): Promise<ReceivedRide> {
-  const userId = await getCurrentUserId();
+  const userId = await getCurrentUserId(scope);
 
   const { data, error } = await supabase
     .from("received_rides")
@@ -53,6 +56,7 @@ export async function createReceivedRide(
       amount: input.amount,
     })
     .select("*")
+    .abortSignal(requestSignal(scope))
     .single();
 
   if (error) {
@@ -62,8 +66,15 @@ export async function createReceivedRide(
   return toReceivedRide(data);
 }
 
-export async function deleteReceivedRide(id: string): Promise<void> {
-  const { error } = await supabase.from("received_rides").delete().eq("id", id);
+export async function deleteReceivedRide(
+  id: string,
+  scope?: SessionScope,
+): Promise<void> {
+  const { error } = await supabase
+    .from("received_rides")
+    .delete()
+    .eq("id", id)
+    .abortSignal(requestSignal(scope));
 
   if (error) {
     throw new Error(errorMessages.unexpected);

@@ -1,28 +1,24 @@
+import { requestSignal, type SessionScope } from "@/lib/sessionScope";
 import { errorMessages } from "@/constants/errorMessages";
 import { toMonthlyCharge } from "@/lib/mappers";
 import { getCurrentUserId, supabase } from "@/lib/supabase";
 import { listReceivedRidesByMonth } from "@/services/receivedRides.service";
 import { listRidesByMonth } from "@/services/rides.service";
 import type { MonthlyCharge } from "@/types/entities";
+import { totalsByPassenger as calculateTotalsByPassenger } from "@/utils/monthlyTotals";
 
 export async function calculateMonthlyCharges(
   referenceMonth: string,
+  scope?: SessionScope,
 ): Promise<MonthlyCharge[]> {
-  const userId = await getCurrentUserId();
+  const userId = await getCurrentUserId(scope);
   const [rides, receivedRides] = await Promise.all([
-    listRidesByMonth(referenceMonth),
-    listReceivedRidesByMonth(referenceMonth),
+    listRidesByMonth(referenceMonth, undefined, scope),
+    listReceivedRidesByMonth(referenceMonth, undefined, scope),
   ]);
+  scope?.assertCurrent();
 
-  const totalsByPassenger = new Map<string, number>();
-  for (const ride of rides) {
-    const current = totalsByPassenger.get(ride.passengerId) ?? 0;
-    totalsByPassenger.set(ride.passengerId, current + ride.rateCharged);
-  }
-  for (const received of receivedRides) {
-    const current = totalsByPassenger.get(received.passengerId) ?? 0;
-    totalsByPassenger.set(received.passengerId, current - received.amount);
-  }
+  const totalsByPassenger = calculateTotalsByPassenger(rides, receivedRides);
 
   if (totalsByPassenger.size === 0) {
     return [];
@@ -40,7 +36,8 @@ export async function calculateMonthlyCharges(
   const { data, error } = await supabase
     .from("monthly_charges")
     .upsert(upserts, { onConflict: "passenger_id,reference_month" })
-    .select("*");
+    .select("*")
+    .abortSignal(requestSignal(scope));
 
   if (error) {
     throw new Error(errorMessages.unexpected);
@@ -51,11 +48,13 @@ export async function calculateMonthlyCharges(
 
 export async function listMonthlyCharges(
   referenceMonth: string,
+  scope?: SessionScope,
 ): Promise<MonthlyCharge[]> {
   const { data, error } = await supabase
     .from("monthly_charges")
     .select("*")
-    .eq("reference_month", referenceMonth);
+    .eq("reference_month", referenceMonth)
+    .abortSignal(requestSignal(scope));
 
   if (error) {
     throw new Error(errorMessages.unexpected);
@@ -67,6 +66,7 @@ export async function listMonthlyCharges(
 export async function markMonthlyChargePaid(
   id: string,
   amount: number,
+  scope?: SessionScope,
 ): Promise<MonthlyCharge> {
   const { data, error } = await supabase
     .from("monthly_charges")
@@ -77,6 +77,7 @@ export async function markMonthlyChargePaid(
     })
     .eq("id", id)
     .select("*")
+    .abortSignal(requestSignal(scope))
     .maybeSingle();
 
   if (error) {
@@ -90,7 +91,10 @@ export async function markMonthlyChargePaid(
   return toMonthlyCharge(data);
 }
 
-export async function unmarkMonthlyChargePaid(id: string): Promise<MonthlyCharge> {
+export async function unmarkMonthlyChargePaid(
+  id: string,
+  scope?: SessionScope,
+): Promise<MonthlyCharge> {
   const { data, error } = await supabase
     .from("monthly_charges")
     .update({
@@ -100,6 +104,7 @@ export async function unmarkMonthlyChargePaid(id: string): Promise<MonthlyCharge
     })
     .eq("id", id)
     .select("*")
+    .abortSignal(requestSignal(scope))
     .maybeSingle();
 
   if (error) {

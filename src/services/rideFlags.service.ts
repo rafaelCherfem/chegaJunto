@@ -1,16 +1,23 @@
+import { requestSignal, type SessionScope } from "@/lib/sessionScope";
 import { errorMessages } from "@/constants/errorMessages";
 import { getCurrentUserId, supabase } from "@/lib/supabase";
 import type { FlaggedRide } from "@/types/entities";
 
 const UNIQUE_VIOLATION = "23505";
 
-export async function createRideFlag(rideId: string): Promise<void> {
-  const userId = await getCurrentUserId();
+export async function createRideFlag(
+  rideId: string,
+  scope?: SessionScope,
+): Promise<void> {
+  const userId = await getCurrentUserId(scope);
 
-  const { error } = await supabase.from("ride_flags").insert({
-    ride_id: rideId,
-    flagged_by: userId,
-  });
+  const { error } = await supabase
+    .from("ride_flags")
+    .insert({
+      ride_id: rideId,
+      flagged_by: userId,
+    })
+    .abortSignal(requestSignal(scope));
 
   if (error) {
     if (error.code === UNIQUE_VIOLATION) {
@@ -20,12 +27,13 @@ export async function createRideFlag(rideId: string): Promise<void> {
   }
 }
 
-export async function listUnresolvedFlags(): Promise<FlaggedRide[]> {
+export async function listUnresolvedFlags(scope?: SessionScope): Promise<FlaggedRide[]> {
   const { data: flags, error } = await supabase
     .from("ride_flags")
     .select("*")
     .eq("resolved", false)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .abortSignal(requestSignal(scope));
 
   if (error) {
     throw new Error(errorMessages.unexpected);
@@ -40,7 +48,8 @@ export async function listUnresolvedFlags(): Promise<FlaggedRide[]> {
   const { data: rides, error: ridesError } = await supabase
     .from("rides")
     .select("*")
-    .in("id", rideIds);
+    .in("id", rideIds)
+    .abortSignal(requestSignal(scope));
 
   if (ridesError) {
     throw new Error(errorMessages.unexpected);
@@ -61,11 +70,12 @@ export async function listUnresolvedFlags(): Promise<FlaggedRide[]> {
   });
 }
 
-export async function resolveFlag(flagId: string): Promise<void> {
+export async function resolveFlag(flagId: string, scope?: SessionScope): Promise<void> {
   const { error } = await supabase
     .from("ride_flags")
     .update({ resolved: true, resolved_at: new Date().toISOString() })
-    .eq("id", flagId);
+    .eq("id", flagId)
+    .abortSignal(requestSignal(scope));
 
   if (error) {
     throw new Error(errorMessages.unexpected);

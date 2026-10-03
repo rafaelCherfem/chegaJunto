@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { usePrivateQuery, usePrivateMutation } from "@/hooks/usePrivateQuery";
 import {
   createRideFlag,
   listUnresolvedFlags,
@@ -8,25 +8,21 @@ import {
 const flagsKey = ["rideFlags"] as const;
 
 export function useUnresolvedFlags() {
-  return useQuery({
+  return usePrivateQuery({
     queryKey: flagsKey,
-    queryFn: listUnresolvedFlags,
+    queryFn: (scope) => listUnresolvedFlags(scope),
   });
 }
 
 export function useFlagRide() {
-  return useMutation({
-    mutationFn: (rideId: string) => createRideFlag(rideId),
+  return usePrivateMutation({
+    mutationFn: (rideId: string, scope) => createRideFlag(rideId, scope),
   });
 }
 
 export function useResolveFlag() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (flagId: string) => resolveFlag(flagId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: flagsKey });
-    },
+  return usePrivateMutation({
+    mutationFn: (flagId: string, scope) => resolveFlag(flagId, scope),
+    invalidate: flagsKey,
   });
 }

@@ -1,14 +1,15 @@
 export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[];
+  string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export interface Database {
   public: {
     Tables: {
+      responsible_accounts: {
+        Row: { user_id: string; created_at: string };
+        Insert: { user_id: string; created_at?: string };
+        Update: { user_id?: string; created_at?: string };
+        Relationships: [];
+      };
       passengers: {
         Row: {
           id: string;
@@ -213,6 +214,7 @@ export interface Database {
     };
     Views: Record<string, never>;
     Functions: {
+      is_responsible: { Args: Record<string, never>; Returns: boolean };
       redeem_passenger_invite: {
         Args: { invite_code: string };
         Returns: undefined;

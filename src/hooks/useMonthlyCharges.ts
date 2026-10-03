@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { usePrivateQuery, usePrivateMutation } from "@/hooks/usePrivateQuery";
 import {
   calculateMonthlyCharges,
   listMonthlyCharges,
@@ -9,42 +9,31 @@ import {
 const monthlyChargesKey = ["monthlyCharges"] as const;
 
 export function useMonthlyCharges(referenceMonth: string) {
-  return useQuery({
+  return usePrivateQuery({
     queryKey: [...monthlyChargesKey, referenceMonth],
-    queryFn: () => listMonthlyCharges(referenceMonth),
+    queryFn: (scope) => listMonthlyCharges(referenceMonth, scope),
   });
 }
 
 export function useCalculateMonthlyCharges() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (referenceMonth: string) => calculateMonthlyCharges(referenceMonth),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: monthlyChargesKey });
-    },
+  return usePrivateMutation({
+    mutationFn: (referenceMonth: string, scope) =>
+      calculateMonthlyCharges(referenceMonth, scope),
+    invalidate: monthlyChargesKey,
   });
 }
 
 export function useMarkMonthlyChargePaid() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ id, amount }: { id: string; amount: number }) =>
-      markMonthlyChargePaid(id, amount),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: monthlyChargesKey });
-    },
+  return usePrivateMutation({
+    mutationFn: ({ id, amount }: { id: string; amount: number }, scope) =>
+      markMonthlyChargePaid(id, amount, scope),
+    invalidate: monthlyChargesKey,
   });
 }
 
 export function useUnmarkMonthlyChargePaid() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (id: string) => unmarkMonthlyChargePaid(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: monthlyChargesKey });
-    },
+  return usePrivateMutation({
+    mutationFn: (id: string, scope) => unmarkMonthlyChargePaid(id, scope),
+    invalidate: monthlyChargesKey,
   });
 }

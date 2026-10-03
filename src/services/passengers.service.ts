@@ -1,3 +1,4 @@
+import { requestSignal, type SessionScope } from "@/lib/sessionScope";
 import { errorMessages } from "@/constants/errorMessages";
 import { toPassenger } from "@/lib/mappers";
 import { getCurrentUserId, supabase } from "@/lib/supabase";
@@ -15,6 +16,7 @@ export interface UpdatePassengerInput {
 
 export async function listPassengers(
   includeInactive = false,
+  scope?: SessionScope,
 ): Promise<Passenger[]> {
   let query = supabase.from("passengers").select("*").order("name");
 
@@ -22,7 +24,7 @@ export async function listPassengers(
     query = query.eq("active", true);
   }
 
-  const { data, error } = await query;
+  const { data, error } = await query.abortSignal(requestSignal(scope));
 
   if (error) {
     throw new Error(errorMessages.unexpected);
@@ -31,11 +33,12 @@ export async function listPassengers(
   return data.map(toPassenger);
 }
 
-export async function getPassenger(id: string): Promise<Passenger> {
+export async function getPassenger(id: string, scope?: SessionScope): Promise<Passenger> {
   const { data, error } = await supabase
     .from("passengers")
     .select("*")
     .eq("id", id)
+    .abortSignal(requestSignal(scope))
     .maybeSingle();
 
   if (error) {
@@ -51,8 +54,9 @@ export async function getPassenger(id: string): Promise<Passenger> {
 
 export async function createPassenger(
   input: CreatePassengerInput,
+  scope?: SessionScope,
 ): Promise<Passenger> {
-  const userId = await getCurrentUserId();
+  const userId = await getCurrentUserId(scope);
 
   const { data, error } = await supabase
     .from("passengers")
@@ -62,6 +66,7 @@ export async function createPassenger(
       default_daily_rate: input.defaultDailyRate,
     })
     .select("*")
+    .abortSignal(requestSignal(scope))
     .single();
 
   if (error) {
@@ -74,6 +79,7 @@ export async function createPassenger(
 export async function updatePassenger(
   id: string,
   input: UpdatePassengerInput,
+  scope?: SessionScope,
 ): Promise<Passenger> {
   const { data, error } = await supabase
     .from("passengers")
@@ -85,6 +91,7 @@ export async function updatePassenger(
     })
     .eq("id", id)
     .select("*")
+    .abortSignal(requestSignal(scope))
     .maybeSingle();
 
   if (error) {
@@ -101,41 +108,46 @@ export async function updatePassenger(
 export async function setPassengerActive(
   id: string,
   active: boolean,
+  scope?: SessionScope,
 ): Promise<void> {
   const { error } = await supabase
     .from("passengers")
     .update({ active })
-    .eq("id", id);
+    .eq("id", id)
+    .abortSignal(requestSignal(scope));
 
   if (error) {
     throw new Error(errorMessages.unexpected);
   }
 }
 
-export async function deletePassenger(id: string): Promise<void> {
+export async function deletePassenger(id: string, scope?: SessionScope): Promise<void> {
   const [rides, charges, receivedRides] = await Promise.all([
     supabase
       .from("rides")
       .select("id", { count: "exact", head: true })
-      .eq("passenger_id", id),
+      .eq("passenger_id", id)
+      .abortSignal(requestSignal(scope)),
     supabase
       .from("monthly_charges")
       .select("id", { count: "exact", head: true })
-      .eq("passenger_id", id),
+      .eq("passenger_id", id)
+      .abortSignal(requestSignal(scope)),
     supabase
       .from("received_rides")
       .select("id", { count: "exact", head: true })
-      .eq("passenger_id", id),
+      .eq("passenger_id", id)
+      .abortSignal(requestSignal(scope)),
   ]);
 
   if (rides.error || charges.error || receivedRides.error) {
     throw new Error(errorMessages.unexpected);
   }
 
+  scope?.assertCurrent();
+
   const hasHistory =
-    (rides.count ?? 0) > 0 ||
-    (charges.count ?? 0) > 0 ||
-    (receivedRides.count ?? 0) > 0;
+    (rides.count ?? 0) > 0 || (charges.count ?? 0) > 0 || (receivedRides.count ?? 0) > 0;
 
   if (hasHistory) {
     throw new Error(
@@ -143,7 +155,11 @@ export async function deletePassenger(id: string): Promise<void> {
     );
   }
 
-  const { error } = await supabase.from("passengers").delete().eq("id", id);
+  const { error } = await supabase
+    .from("passengers")
+    .delete()
+    .eq("id", id)
+    .abortSignal(requestSignal(scope));
 
   if (error) {
     throw new Error(errorMessages.unexpected);

@@ -19,7 +19,10 @@ export interface SignUpInput {
   password: string;
 }
 
-export async function signUpWithPassword(input: SignUpInput): Promise<boolean> {
+export async function signUpWithPassword(
+  input: SignUpInput,
+  onSession?: (session: Session) => Promise<void>,
+): Promise<boolean> {
   const { data, error } = await supabase.auth.signUp(input);
 
   if (error) {
@@ -30,6 +33,7 @@ export async function signUpWithPassword(input: SignUpInput): Promise<boolean> {
     );
   }
 
+  if (data.session && onSession) await onSession(data.session);
   return data.session !== null;
 }
 

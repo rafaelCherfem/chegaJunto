@@ -1,26 +1,20 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { usePrivateQuery, usePrivateMutation } from "@/hooks/usePrivateQuery";
 import {
   createPassengerInvite,
   listPassengerInvites,
 } from "@/services/passengerAccounts.service";
 
 export function usePassengerInvites(passengerId: string, enabled: boolean) {
-  return useQuery({
+  return usePrivateQuery({
     queryKey: ["passengerInvites", passengerId],
-    queryFn: () => listPassengerInvites(passengerId),
+    queryFn: (scope) => listPassengerInvites(passengerId, scope),
     enabled,
   });
 }
 
 export function useCreatePassengerInvite() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (passengerId: string) => createPassengerInvite(passengerId),
-    onSuccess: (_data, passengerId) => {
-      queryClient.invalidateQueries({
-        queryKey: ["passengerInvites", passengerId],
-      });
-    },
+  return usePrivateMutation({
+    mutationFn: (passengerId: string, scope) => createPassengerInvite(passengerId, scope),
+    invalidate: ["passengerInvites"],
   });
 }

@@ -16,7 +16,7 @@ import { redeemPassengerInvite } from "@/services/passengerAccounts.service";
 
 export function InviteRedemptionPage() {
   const { code } = useParams<{ code: string }>();
-  const { user, loading } = useAuth();
+  const { user, loading, getScope } = useAuth();
   const navigate = useNavigate();
 
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -39,15 +39,19 @@ export function InviteRedemptionPage() {
     }
 
     try {
-      const hasSession = await signUpWithPassword(values);
+      const hasSession = await signUpWithPassword(values, async (session) => {
+        const scope = getScope();
+        scope.assertCurrent();
+        if (scope.userId !== session.user.id) throw new Error("A sessão mudou.");
+        await redeemPassengerInvite(code, scope);
+        scope.assertCurrent();
+        navigate("/", { replace: true });
+      });
 
       if (!hasSession) {
         setPendingConfirmation(true);
         return;
       }
-
-      await redeemPassengerInvite(code);
-      navigate("/", { replace: true });
     } catch (error) {
       setSubmitError(
         error instanceof Error ? error.message : "Não foi possível concluir o cadastro.",
@@ -91,8 +95,8 @@ export function InviteRedemptionPage() {
                 Quase lá — confirme seu e-mail para ativar a conta.
               </p>
               <p className="text-sm opacity-70">
-                Depois de confirmar, acesse este mesmo link de convite de
-                novo para concluir o vínculo.
+                Depois de confirmar, acesse este mesmo link de convite de novo para
+                concluir o vínculo.
               </p>
             </div>
           ) : (
@@ -119,9 +123,7 @@ export function InviteRedemptionPage() {
                   {...register("password")}
                 />
                 {errors.password && (
-                  <p className="text-xs text-destructive">
-                    {errors.password.message}
-                  </p>
+                  <p className="text-xs text-destructive">{errors.password.message}</p>
                 )}
               </div>
 
@@ -140,9 +142,7 @@ export function InviteRedemptionPage() {
                 )}
               </div>
 
-              {submitError && (
-                <p className="text-xs text-destructive">{submitError}</p>
-              )}
+              {submitError && <p className="text-xs text-destructive">{submitError}</p>}
 
               <Button type="submit" disabled={isSubmitting} className="w-full">
                 {isSubmitting ? "Criando conta..." : "Criar conta"}
