@@ -1,83 +1,103 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   useCreatePassengerInvite,
   usePassengerInvites,
+  useRevokePassengerInvite,
 } from "@/hooks/usePassengerInvites";
+import { inviteStatus } from "@/utils/inviteStatus";
 
-interface PassengerInvitePanelProps {
-  passengerId: string;
-}
-
-export function PassengerInvitePanel({ passengerId }: PassengerInvitePanelProps) {
-  const { data: invites, isLoading } = usePassengerInvites(passengerId, true);
+export function PassengerInvitePanel({ passengerId }: { passengerId: string }) {
+  const { data: invites, isLoading, isError } = usePassengerInvites(passengerId, true);
   const createInvite = useCreatePassengerInvite();
-
-  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const revokeInvite = useRevokePassengerInvite();
+  const [delivery, setDelivery] = useState<{ id: string; token: string } | null>(null);
+  const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const hasLinkedAccount = invites?.some((invite) => invite.used) ?? false;
-  const pendingInvite = invites?.find((invite) => !invite.used);
-
-  async function handleCreate() {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const delivered = invites?.find((invite) => invite.id === delivery?.id);
+  const canCopy = delivery && (!delivered || inviteStatus(delivered, now) === "Pendente");
+  async function create() {
     setError(null);
-
     try {
-      await createInvite.mutateAsync(passengerId);
+      setDelivery(await createInvite.mutateAsync(passengerId));
+      setCopied(false);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Não foi possível gerar o código.",
-      );
+      setError(err instanceof Error ? err.message : "Falha temporária.");
     }
   }
-
-  function handleCopy(code: string) {
-    const url = `${window.location.origin}/convite/${code}`;
-    navigator.clipboard.writeText(url).then(() => {
-      setCopiedCode(code);
-      setTimeout(() => {
-        setCopiedCode((current) => (current === code ? null : current));
-      }, 2000);
-    });
+  async function revoke(id: string) {
+    setError(null);
+    try {
+      await revokeInvite.mutateAsync(id);
+      if (delivery?.id === id) setDelivery(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha temporária.");
+    }
   }
-
+  async function copy() {
+    if (!canCopy) return;
+    try {
+      await navigator.clipboard.writeText(
+        `${window.location.origin}/convite#token=${delivery.token}`,
+      );
+      setCopied(true);
+    } catch {
+      setError("Não foi possível copiar o link. Tente novamente.");
+    }
+  }
   return (
     <div className="mt-3 border-t border-black/10 pt-3">
-      <p className="mb-2 text-xs font-medium opacity-70">
-        Acesso do passageiro
+      <p className="mb-2 text-xs font-medium opacity-70">Acesso do passageiro</p>
+      {isLoading && <p>Carregando...</p>}
+      {isError && <p role="alert">Não foi possível carregar os convites.</p>}
+      <p className="text-xs">
+        O novo convite substitui o anterior. Copie o link agora; ele não será recuperável
+        depois.
       </p>
-
-      {isLoading && <p className="text-xs opacity-70">Carregando...</p>}
-
-      {!isLoading && hasLinkedAccount && (
-        <p className="text-xs">Este passageiro já tem acesso próprio.</p>
-      )}
-
-      {!isLoading && !hasLinkedAccount && pendingInvite && (
-        <div className="flex items-center justify-between gap-2 rounded-md bg-black/5 px-3 py-2">
-          <span className="font-mono text-xs">{pendingInvite.code}</span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleCopy(pendingInvite.code)}
-          >
-            {copiedCode === pendingInvite.code ? "Copiado!" : "Copiar link"}
-          </Button>
-        </div>
-      )}
-
-      {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
-
-      {!isLoading && !hasLinkedAccount && !pendingInvite && (
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={createInvite.isPending}
-          onClick={handleCreate}
-        >
-          {createInvite.isPending ? "Gerando..." : "Gerar código de convite"}
+      {canCopy && (
+        <Button variant="outline" size="sm" onClick={copy}>
+          {copied ? "Copiado!" : "Copiar link"}
         </Button>
       )}
+      {invites?.map((invite) => (
+        <div
+          key={invite.id}
+          className="mt-2 flex items-center justify-between gap-2 text-xs"
+        >
+          <span>
+            {inviteStatus(invite, now)} · expira{" "}
+            {new Date(invite.expiresAt).toLocaleString("pt-BR")}
+          </span>
+          {!invite.used && !invite.revokedAt && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={revokeInvite.isPending}
+              onClick={() => revoke(invite.id)}
+            >
+              Revogar
+            </Button>
+          )}
+        </div>
+      ))}
+      {error && (
+        <p role="alert" className="text-xs text-destructive">
+          {error}
+        </p>
+      )}
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={isLoading || isError || createInvite.isPending}
+        onClick={create}
+      >
+        {createInvite.isPending ? "Gerando..." : "Gerar novo convite"}
+      </Button>
     </div>
   );
 }

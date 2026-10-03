@@ -26,9 +26,11 @@ export interface ReceivedRide {
 export interface PassengerInvite {
   id: string;
   passengerId: string;
-  code: string;
   used: boolean;
   createdAt: string;
+  expiresAt: string;
+  usedAt: string | null;
+  revokedAt: string | null;
 }
 
 export interface FlaggedRide {

@@ -135,31 +135,31 @@ export interface Database {
           id: string;
           passenger_id: string;
           owner_user_id: string;
-          code: string;
+          token_hash: string;
           used: boolean;
           used_by: string | null;
           created_at: string;
+          expires_at: string;
           used_at: string | null;
+          revoked_at: string | null;
         };
         Insert: {
           id?: string;
           passenger_id: string;
           owner_user_id: string;
-          code: string;
+          token_hash: string;
+          created_at?: string;
+          expires_at?: string;
           used?: boolean;
           used_by?: string | null;
-          created_at?: string;
           used_at?: string | null;
+          revoked_at?: string | null;
         };
         Update: {
-          id?: string;
-          passenger_id?: string;
-          owner_user_id?: string;
-          code?: string;
           used?: boolean;
           used_by?: string | null;
-          created_at?: string;
           used_at?: string | null;
+          revoked_at?: string | null;
         };
         Relationships: [];
       };
@@ -215,6 +215,11 @@ export interface Database {
     Views: Record<string, never>;
     Functions: {
       is_responsible: { Args: Record<string, never>; Returns: boolean };
+      create_passenger_invite: {
+        Args: { target_passenger: string; invite_token: string };
+        Returns: string;
+      };
+      revoke_passenger_invite: { Args: { target_invite: string }; Returns: undefined };
       redeem_passenger_invite: {
         Args: { invite_code: string };
         Returns: undefined;

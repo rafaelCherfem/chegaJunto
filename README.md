@@ -213,3 +213,131 @@ Correções do checkpoint limitadas ao escopo: remoção de factory de chave nã
 especificação explícita do TODO E2E real de sessão e atualização desta documentação.
 Não foi implementada funcionalidade nova. Persistem os limites documentados de
 concorrência real, E2E de Auth, escrita já aceita pelo servidor e preparo de produção.
+
+
+## Etapa 4 — ciclo de vida dos convites
+
+Implementação local, sem deploy: a migration 0006 substitui o código em claro por
+SHA-256 (pgcrypto). Tokens novos usam 32 bytes de crypto.getRandomValues: 256 bits,
+64 caracteres hexadecimais URL-safe. O banco guarda apenas token_hash; a lista
+não fornece o token bruto. O responsável recebe o link uma vez, em memória:
+`/convite#token=...`. O fragmento não é enviado nas requisições de navegação nem
+como Referer. O token chega à RPC pelo corpo autenticado da requisição. Não há
+logs de aplicação com o token, e erros inesperados são sanitizados.
+
+created_at, expires_at, used_at/used_by e revoked_at representam Pendente, Usado,
+Expirado e Revogado. expires_at é exatamente created_at + 168 horas, garantido
+por constraint e RPC, independente de timezone/DST. Resgate usa clock_timestamp,
+incluindo tempo gasto esperando locks. Revogação própria é idempotente para
+convite já revogado; usado não pode ser revogado. Criar novo convite revoga o
+anterior ainda não usado, inclusive expirado: há um índice único parcial por
+passageiro para impedir dois pendentes. Um alvo já vinculado não pode ser convidado.
+
+RPCs create_passenger_invite, revoke_passenger_invite e redeem_passenger_invite
+usam SECURITY DEFINER (necessário para alterações negadas diretamente aos clientes),
+search_path vazio e objetos qualificados. PUBLIC/anon não executam; authenticated
+executa, com auth.uid e papel explícito validados internamente. Responsável lê
+somente seus convites por RLS, sem INSERT/UPDATE/DELETE direto. Passageiro/unlinked
+não lista. FKs compostas e exclusividade responsible/passenger permanecem.
+
+Criação/revogação/resgate serializam pelo lock do passageiro antes do convite.
+Resgate também trava auth.users para exclusividade de papel. Vínculo e consumo
+ocorrem na mesma transação, com UNIQUE(passenger_id) como segunda barreira.
+Usuário já vinculado não troca de owner por convite. O fluxo mantém queries,
+mutations e respostas tardias escopadas por sessão, inclusive na criação/revogação.
+
+A página aceita conta existente ou cadastro. Signup sem sessão não consome o
+convite. Token de continuidade fica apenas em sessionStorage, com prazo máximo
+de sete dias e remoção no sucesso; não vai para localStorage nem para emailRedirectTo.
+Confirmação retorna a /convite e recupera o token no mesmo contexto de navegador.
+O usuário confirma explicitamente a conta pelo botão Usar convite. Em outra aba
+sem sessionStorage compartilhado ou outro navegador, deve reabrir o link original.
+O banco continua sendo a autoridade para a expiração. A configuração LOCAL usa
+127.0.0.1:5173, permite /convite também em localhost:5173 e exige confirmação de
+email. Uma implantação futura precisa configurar o domínio/redirect permitido no
+Auth remoto; isso não foi executado nesta etapa.
+
+0001–0005 permanecem intactas. A 0006 invalida códigos legados fracos pendentes,
+preserva consumo histórico e elimina a coluna code. Antes de qualquer implantação
+em dados reais, será necessária revisão/back-up e verificação das constraints em
+linhas antigas (inclusive used_at fora dos sete dias ou timestamps contraditórios).
+Nenhum backfill automático de responsible é introduzido.
+
+Testes: as 152 asserções anteriores permanecem, com fixtures hash/contrato de
+INSERT adaptadas à 0006; a fixture de FK usa alvo sem convite prévio para impedir
+que UNIQUE mascare a FK. Há 59 novas asserções pgTAP. Frontend tem 82 testes
+aprovados (50 anteriores + 32 novos), mantendo 14 TODO futuros. Os testes de
+service exercitam mapeamento real dos códigos SQL e sanitização de erros de rede;
+as regressões de sessão e signup anteriores continuam passando.
+
+Scripts reprodutíveis, exclusivos do container/URLs locais e sem credenciais
+persistidas ou impressas:
+
+```sh
+supabase db reset --local --yes
+supabase test db --local
+node scripts/test-invite-concurrency.mjs
+node scripts/test-invite-confirmation.mjs
+npm run test:run
+npm run typecheck
+npm run build
+git diff --check
+```
+
+O teste concorrente abre duas conexões psql distintas, confirma ambas esperando
+no mesmo lock, libera a barreira e exige um sucesso/um INVITE_USED, com exatamente
+um vínculo e used_at/used_by coerentes. O teste de email usa Auth/SMTP/Mailpit
+locais reais: sessão nula antes de confirmar, resgate anônimo negado, link real de
+confirmação/redirect, login e RPC. Ambos limpam fixtures SQL sintéticas ao terminar.
+Isso complementa RTL; não substitui E2E visual de navegador nem exercita produção.
+
+Não há rate limit próprio de resgate nesta etapa (tokens têm alta entropia), nem
+mudanças financeiras, flags, PDF, exclusão/desvinculação final ou dependências.
+Abort não desfaz escrita já aceita pelo servidor. Tokens são credenciais bearer:
+quem recebe um link válido pode resgatá-lo numa conta elegível; a proteção de XSS
+e de observabilidade de infraestrutura permanece necessária. A lista deriva status
+com relógio do dispositivo; a RPC sempre decide validade pelo relógio do banco.
+
+
+Validação final da Etapa 4: duas reconstruções limpas 0001→0006 aprovadas,
+211/211 pgTAP em cada uma (152 anteriores + 59 novos; zero failed/skipped/TODO),
+concorrência real e confirmação real de email aprovadas em ambas. Frontend:
+82 aprovados + 14 TODO futuros. TypeScript, ESLint dos arquivos alterados, build
+e git diff --check aprovados. Build conserva somente o aviso de bundle >500 kB.
+Sem dependências novas, commit, push ou acesso à produção. HEAD preservado:
+0b91d2b81be2ae74858796d7611f4dec1610ff23, branch hardening/security-reliability.
+
+Fluxo antigo revisado: Math.random gerava oito caracteres de alfabeto de 32
+símbolos (40 bits nominais, sem fonte criptográfica), armazenados em code e no
+caminho /convite/:code. Não havia expiração/revogação, a UI tratava qualquer
+convite não usado como pendente, impedia conta já autenticada e exigia reabertura
+manual após confirmação. A RPC da 0005 já tinha transação/locking e isolamento
+de papéis; estes controles foram mantidos. Não foi encontrado logging explícito
+do código no frontend antigo; o caminho podia chegar aos logs de navegação.
+
+Arquivos da Etapa 4 (22; 14 modificados e oito novos):
+
+```text
+README.md
+scripts/test-invite-concurrency.mjs
+scripts/test-invite-confirmation.mjs
+src/app/App.tsx
+src/components/passengers/PassengerInvitePanel.tsx
+src/hooks/usePassengerInvites.ts
+src/lib/mappers.ts
+src/pages/InviteRedemptionPage.tsx
+src/services/auth.service.ts
+src/services/passengerAccounts.service.ts
+src/types/database.ts
+src/types/entities.ts
+src/utils/inviteCode.ts
+src/utils/inviteStatus.ts
+src/utils/pendingInvite.ts
+supabase/config.toml
+supabase/migrations/0006_invite_lifecycle.sql
+supabase/tests/0005_roles_and_isolation.test.sql
+supabase/tests/0006_invite_lifecycle.test.sql
+tests/invite.lifecycle.test.tsx
+tests/invite.service.test.ts
+tests/invite.session.test.tsx
+```

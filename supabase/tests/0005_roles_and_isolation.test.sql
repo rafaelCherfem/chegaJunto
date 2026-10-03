@@ -25,8 +25,8 @@ insert into public.received_rides(user_id,passenger_id,received_date,amount)
 select user_id,id,'2025-01-01',2 from public.passengers;
 insert into public.monthly_charges(user_id,passenger_id,reference_month,total_amount)
 select user_id,id,'2025-01-01',8 from public.passengers;
-insert into public.passenger_invites(passenger_id,owner_user_id,code)
-select id,user_id,'synthetic-' || id::text from public.passengers;
+insert into public.passenger_invites(passenger_id,owner_user_id,token_hash)
+select id,user_id,encode(extensions.digest(repeat(right(id::text,1),64),'sha256'),'hex') from public.passengers;
 
 select ok(not has_table_privilege('authenticated','public.responsible_accounts','INSERT'), 'responsibility cannot be self assigned');
 select ok(not has_table_privilege('authenticated','public.passenger_accounts','INSERT'), 'links can only be inserted through controlled operations');
@@ -41,7 +41,7 @@ insert into public.passengers(id,user_id,name,default_daily_rate) values
 select throws_ok('insert into public.rides(user_id,passenger_id,ride_date,rate_charged) values(''10000000-0000-0000-0000-000000000001'',''20000000-0000-0000-0000-000000000002'',''2025-02-01'',10)','23503',null,'privileged cross relation rejected: rides');
 select throws_ok('insert into public.received_rides(user_id,passenger_id,received_date,amount) values(''10000000-0000-0000-0000-000000000001'',''20000000-0000-0000-0000-000000000002'',''2025-02-01'',2)','23503',null,'privileged cross relation rejected: received_rides');
 select throws_ok('insert into public.monthly_charges(user_id,passenger_id,reference_month,total_amount) values(''10000000-0000-0000-0000-000000000001'',''20000000-0000-0000-0000-000000000002'',''2025-02-01'',8)','23503',null,'privileged cross relation rejected: monthly_charges');
-select throws_ok('insert into public.passenger_invites(owner_user_id,passenger_id,code) values(''10000000-0000-0000-0000-000000000001'',''20000000-0000-0000-0000-000000000002'',''cross-invite'')','23503',null,'privileged cross relation rejected: passenger_invites');
+select throws_ok('insert into public.passenger_invites(owner_user_id,passenger_id,token_hash) values(''10000000-0000-0000-0000-000000000001'',''20000000-0000-0000-0000-000000000009'',''c068c4358ff67c75f8e071fa839f1bfc9d242eaa0515cfc46f0bd4dbf0c15c9a'')','23503',null,'privileged cross relation rejected: passenger_invites');
 select throws_ok('insert into public.passenger_accounts(owner_user_id,passenger_id,user_id) values(''10000000-0000-0000-0000-000000000001'',''20000000-0000-0000-0000-000000000009'',''10000000-0000-0000-0000-000000000005'')','23503',null,'privileged cross relation rejected: passenger_accounts');
 select throws_ok($$insert into public.responsible_accounts(user_id) values('10000000-0000-0000-0000-000000000003')$$,'23514',null,'passenger cannot acquire responsibility');
 select throws_ok($$insert into public.passenger_accounts(user_id,passenger_id,owner_user_id) values('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001')$$,'23514',null,'responsible cannot acquire passenger role');
@@ -72,14 +72,14 @@ select throws_ok('insert into public.monthly_charges(user_id,passenger_id,refere
 select throws_ok('update public.monthly_charges set passenger_id=''20000000-0000-0000-0000-000000000002'' where user_id=''10000000-0000-0000-0000-000000000001''','23514',null,'relationship is immutable: monthly_charges');
 select throws_ok('update public.monthly_charges set user_id=''10000000-0000-0000-0000-000000000002'' where user_id=''10000000-0000-0000-0000-000000000001''','23514',null,'owner identity is immutable: monthly_charges');
 select lives_ok('update public.monthly_charges set passenger_id=passenger_id where user_id=''10000000-0000-0000-0000-000000000001''','owner 1 can update own monthly_charges');
-select lives_ok('insert into public.passenger_invites(owner_user_id,passenger_id,code) values(''10000000-0000-0000-0000-000000000001'',''20000000-0000-0000-0000-000000000001'',''own-invite-1'')','owner 1 can insert own passenger_invites');
-select throws_ok('insert into public.passenger_invites(owner_user_id,passenger_id,code) values(''10000000-0000-0000-0000-000000000001'',''20000000-0000-0000-0000-000000000002'',''cross-invite'')','23503',null,'owner 1 cross passenger rejected: passenger_invites');
-select throws_ok('insert into public.passenger_invites(owner_user_id,passenger_id,code) values(''10000000-0000-0000-0000-000000000002'',''20000000-0000-0000-0000-000000000002'',''cross-invite'')','42501',null,'owner 1 identity spoof rejected: passenger_invites');
+select throws_ok('insert into public.passenger_invites(owner_user_id,passenger_id,token_hash) values(''10000000-0000-0000-0000-000000000001'',''20000000-0000-0000-0000-000000000001'',''own-invite-1'')','42501',null,'owner 1 cannot bypass invite creation RPC');
+select throws_ok('insert into public.passenger_invites(owner_user_id,passenger_id,token_hash) values(''10000000-0000-0000-0000-000000000001'',''20000000-0000-0000-0000-000000000002'',''c068c4358ff67c75f8e071fa839f1bfc9d242eaa0515cfc46f0bd4dbf0c15c9a'')','42501',null,'owner 1 cross passenger rejected: passenger_invites');
+select throws_ok('insert into public.passenger_invites(owner_user_id,passenger_id,token_hash) values(''10000000-0000-0000-0000-000000000002'',''20000000-0000-0000-0000-000000000002'',''c068c4358ff67c75f8e071fa839f1bfc9d242eaa0515cfc46f0bd4dbf0c15c9a'')','42501',null,'owner 1 identity spoof rejected: passenger_invites');
 select lives_ok('insert into public.passengers(user_id,name,default_daily_rate) values(''10000000-0000-0000-0000-000000000001'',''Synthetic extra'',10)','owner 1 can create passenger');
 select lives_ok('update public.passengers set name=''Synthetic updated'' where id=''20000000-0000-0000-0000-000000000001''','owner 1 can update passenger');
 select throws_ok('update public.passengers set user_id=''10000000-0000-0000-0000-000000000002'' where id=''20000000-0000-0000-0000-000000000001''','23514',null,'passenger ownership immutable');
 select throws_ok('delete from public.passengers where id=''20000000-0000-0000-0000-000000000001''','23503',null,'dependencies restrict passenger deletion');
-select throws_ok('select public.redeem_passenger_invite(''synthetic-20000000-0000-0000-0000-000000000001'')','23514',null,'owner cannot redeem into passenger');
+select throws_ok('select public.redeem_passenger_invite(''1111111111111111111111111111111111111111111111111111111111111111'')','23514',null,'owner cannot redeem into passenger');
 reset role;
 set local role authenticated;
 set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000002';
@@ -108,14 +108,14 @@ select throws_ok('insert into public.monthly_charges(user_id,passenger_id,refere
 select throws_ok('update public.monthly_charges set passenger_id=''20000000-0000-0000-0000-000000000001'' where user_id=''10000000-0000-0000-0000-000000000002''','23514',null,'relationship is immutable: monthly_charges');
 select throws_ok('update public.monthly_charges set user_id=''10000000-0000-0000-0000-000000000001'' where user_id=''10000000-0000-0000-0000-000000000002''','23514',null,'owner identity is immutable: monthly_charges');
 select lives_ok('update public.monthly_charges set passenger_id=passenger_id where user_id=''10000000-0000-0000-0000-000000000002''','owner 2 can update own monthly_charges');
-select lives_ok('insert into public.passenger_invites(owner_user_id,passenger_id,code) values(''10000000-0000-0000-0000-000000000002'',''20000000-0000-0000-0000-000000000002'',''own-invite-2'')','owner 2 can insert own passenger_invites');
-select throws_ok('insert into public.passenger_invites(owner_user_id,passenger_id,code) values(''10000000-0000-0000-0000-000000000002'',''20000000-0000-0000-0000-000000000001'',''cross-invite'')','23503',null,'owner 2 cross passenger rejected: passenger_invites');
-select throws_ok('insert into public.passenger_invites(owner_user_id,passenger_id,code) values(''10000000-0000-0000-0000-000000000001'',''20000000-0000-0000-0000-000000000001'',''cross-invite'')','42501',null,'owner 2 identity spoof rejected: passenger_invites');
+select throws_ok('insert into public.passenger_invites(owner_user_id,passenger_id,token_hash) values(''10000000-0000-0000-0000-000000000002'',''20000000-0000-0000-0000-000000000002'',''own-invite-2'')','42501',null,'owner 2 cannot bypass invite creation RPC');
+select throws_ok('insert into public.passenger_invites(owner_user_id,passenger_id,token_hash) values(''10000000-0000-0000-0000-000000000002'',''20000000-0000-0000-0000-000000000001'',''c068c4358ff67c75f8e071fa839f1bfc9d242eaa0515cfc46f0bd4dbf0c15c9a'')','42501',null,'owner 2 cross passenger rejected: passenger_invites');
+select throws_ok('insert into public.passenger_invites(owner_user_id,passenger_id,token_hash) values(''10000000-0000-0000-0000-000000000001'',''20000000-0000-0000-0000-000000000001'',''c068c4358ff67c75f8e071fa839f1bfc9d242eaa0515cfc46f0bd4dbf0c15c9a'')','42501',null,'owner 2 identity spoof rejected: passenger_invites');
 select lives_ok('insert into public.passengers(user_id,name,default_daily_rate) values(''10000000-0000-0000-0000-000000000002'',''Synthetic extra'',10)','owner 2 can create passenger');
 select lives_ok('update public.passengers set name=''Synthetic updated'' where id=''20000000-0000-0000-0000-000000000002''','owner 2 can update passenger');
 select throws_ok('update public.passengers set user_id=''10000000-0000-0000-0000-000000000001'' where id=''20000000-0000-0000-0000-000000000002''','23514',null,'passenger ownership immutable');
 select throws_ok('delete from public.passengers where id=''20000000-0000-0000-0000-000000000002''','23503',null,'dependencies restrict passenger deletion');
-select throws_ok('select public.redeem_passenger_invite(''synthetic-20000000-0000-0000-0000-000000000002'')','23514',null,'owner cannot redeem into passenger');
+select throws_ok('select public.redeem_passenger_invite(''2222222222222222222222222222222222222222222222222222222222222222'')','23514',null,'owner cannot redeem into passenger');
 reset role;
 set local role authenticated;
 set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000003';
@@ -167,24 +167,24 @@ select is((select count(*) from public.passenger_accounts),0::bigint,'unlinked h
 select is((select count(*) from public.ride_flags),0::bigint,'unlinked has no rows: ride_flags');
 select is((select count(*) from public.responsible_accounts),0::bigint,'unlinked has no rows: responsible_accounts');
 -- A duplicate passenger association must fail without consuming the invite.
-select throws_ok($$select public.redeem_passenger_invite('synthetic-20000000-0000-0000-0000-000000000001')$$,'23505',null,'cannot overwrite an existing passenger link');
+select throws_ok($$select public.redeem_passenger_invite('1111111111111111111111111111111111111111111111111111111111111111')$$,'23505',null,'cannot overwrite an existing passenger link');
 
 reset role;
 insert into public.passengers(id,user_id,name,default_daily_rate) values
 ('20000000-0000-0000-0000-000000000003','10000000-0000-0000-0000-000000000001','Fresh synthetic invite',10);
-insert into public.passenger_invites(passenger_id,owner_user_id,code) values
-('20000000-0000-0000-0000-000000000003','10000000-0000-0000-0000-000000000001','fresh-synthetic-code');
+insert into public.passenger_invites(passenger_id,owner_user_id,token_hash) values
+('20000000-0000-0000-0000-000000000003','10000000-0000-0000-0000-000000000001','79bd7d7fd684b399857c582b1b7172ddf277d4fe1b027ec52b28da3ae381e675');
 set local role authenticated;
 set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000005';
 select throws_ok($$insert into public.responsible_accounts(user_id) values('10000000-0000-0000-0000-000000000005')$$,'42501',null,'client cannot self grant role');
 select throws_ok($$insert into public.passenger_accounts(user_id,passenger_id,owner_user_id) values('10000000-0000-0000-0000-000000000005','20000000-0000-0000-0000-000000000003','10000000-0000-0000-0000-000000000001')$$,'42501',null,'client cannot manufacture link');
-select lives_ok($$select public.redeem_passenger_invite('fresh-synthetic-code')$$,'valid invite grants passenger access');
+select lives_ok($$select public.redeem_passenger_invite('3333333333333333333333333333333333333333333333333333333333333333')$$,'valid invite grants passenger access');
 select is((select passenger_id from public.passenger_accounts where user_id=auth.uid()),'20000000-0000-0000-0000-000000000003'::uuid,'RPC links the intended passenger');
 select ok(not public.is_responsible(),'redemption never grants responsibility');
-select throws_ok($$select public.redeem_passenger_invite('fresh-synthetic-code')$$,'23514',null,'linked user cannot redeem again');
+select throws_ok($$select public.redeem_passenger_invite('3333333333333333333333333333333333333333333333333333333333333333')$$,'23514',null,'linked user cannot redeem again');
 reset role;
-select ok((select used from public.passenger_invites where code='fresh-synthetic-code'),'RPC consumes invite');
-select is((select used_by from public.passenger_invites where code='fresh-synthetic-code'),'10000000-0000-0000-0000-000000000005'::uuid,'RPC records the correct account');
+select ok((select used from public.passenger_invites where token_hash='79bd7d7fd684b399857c582b1b7172ddf277d4fe1b027ec52b28da3ae381e675'),'RPC consumes invite');
+select is((select used_by from public.passenger_invites where token_hash='79bd7d7fd684b399857c582b1b7172ddf277d4fe1b027ec52b28da3ae381e675'),'10000000-0000-0000-0000-000000000005'::uuid,'RPC records the correct account');
 set local role authenticated;
 set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
 select is((select count(*) from public.ride_flags where ride_id='30000000-0000-0000-0000-000000000002'),0::bigint,'owner cannot read foreign flags');

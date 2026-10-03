@@ -22,8 +22,12 @@ export interface SignUpInput {
 export async function signUpWithPassword(
   input: SignUpInput,
   onSession?: (session: Session) => Promise<void>,
+  emailRedirectTo?: string,
 ): Promise<boolean> {
-  const { data, error } = await supabase.auth.signUp(input);
+  const { data, error } = await supabase.auth.signUp({
+    ...input,
+    ...(emailRedirectTo ? { options: { emailRedirectTo } } : {}),
+  });
 
   if (error) {
     throw new Error(

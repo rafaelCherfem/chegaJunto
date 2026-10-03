@@ -48,8 +48,10 @@ export function toPassengerInvite(row: PassengerInviteRow): PassengerInvite {
   return {
     id: row.id,
     passengerId: row.passenger_id,
-    code: row.code,
     used: row.used,
+    expiresAt: row.expires_at,
+    usedAt: row.used_at,
+    revokedAt: row.revoked_at,
     createdAt: row.created_at,
   };
 }

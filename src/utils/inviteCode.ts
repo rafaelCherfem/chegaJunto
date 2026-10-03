@@ -1,11 +1,6 @@
-const INVITE_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-const INVITE_CODE_LENGTH = 8;
-
+// 32 uniformly random bytes: 256 bits, URL-safe hexadecimal.
 export function generateInviteCode(): string {
-  let code = "";
-  for (let i = 0; i < INVITE_CODE_LENGTH; i++) {
-    const index = Math.floor(Math.random() * INVITE_CODE_ALPHABET.length);
-    code += INVITE_CODE_ALPHABET[index];
-  }
-  return code;
+  return Array.from(crypto.getRandomValues(new Uint8Array(32)), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
 }

@@ -23,6 +23,7 @@ export function App() {
             <Route element={<GuestRoute />}>
               <Route path="/login" element={<LoginPage />} />
             </Route>
+            <Route path="/convite" element={<InviteRedemptionPage />} />
             <Route path="/convite/:code" element={<InviteRedemptionPage />} />
             <Route element={<ProtectedRoute />}>
               <Route element={<RoleRouter />}>

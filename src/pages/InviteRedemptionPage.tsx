@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { CarIllustration } from "@/components/illustrations/CarIllustration";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,16 +11,48 @@ import {
   inviteSignupSchema,
   type InviteSignupFormValues,
 } from "@/schemas/inviteSignup.schema";
-import { signOut, signUpWithPassword } from "@/services/auth.service";
+import { signInWithPassword, signOut, signUpWithPassword } from "@/services/auth.service";
 import { redeemPassengerInvite } from "@/services/passengerAccounts.service";
 
+import { forgetInvite, recalledInvite, rememberInvite } from "@/utils/pendingInvite";
+
 export function InviteRedemptionPage() {
-  const { code } = useParams<{ code: string }>();
+  const { code: legacyCode } = useParams<{ code: string }>();
+  const location = useLocation();
+  const code =
+    new URLSearchParams(location.hash.slice(1)).get("token") ??
+    legacyCode ??
+    recalledInvite();
   const { user, loading, getScope } = useAuth();
   const navigate = useNavigate();
 
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [pendingConfirmation, setPendingConfirmation] = useState(false);
+  const [loginMode, setLoginMode] = useState(false);
+  const [redeeming, setRedeeming] = useState(false);
+  async function redeem() {
+    if (!code || !/^[0-9a-f]{64}$/.test(code)) {
+      setSubmitError("Convite inválido.");
+      return;
+    }
+    const scope = getScope();
+    setRedeeming(true);
+    setSubmitError(null);
+    try {
+      scope.assertCurrent();
+      await redeemPassengerInvite(code, scope);
+      scope.assertCurrent();
+      forgetInvite();
+      navigate("/", { replace: true });
+    } catch (error) {
+      if (!scope.signal.aborted)
+        setSubmitError(
+          error instanceof Error ? error.message : "Falha temporária. Tente novamente.",
+        );
+    } finally {
+      if (!scope.signal.aborted) setRedeeming(false);
+    }
+  }
 
   const {
     register,
@@ -33,20 +65,26 @@ export function InviteRedemptionPage() {
   async function onSubmit(values: InviteSignupFormValues) {
     setSubmitError(null);
 
-    if (!code) {
+    if (!code || !/^[0-9a-f]{64}$/.test(code)) {
       setSubmitError("Link de convite inválido.");
       return;
     }
 
+    rememberInvite(code);
     try {
-      const hasSession = await signUpWithPassword(values, async (session) => {
-        const scope = getScope();
-        scope.assertCurrent();
-        if (scope.userId !== session.user.id) throw new Error("A sessão mudou.");
-        await redeemPassengerInvite(code, scope);
-        scope.assertCurrent();
-        navigate("/", { replace: true });
-      });
+      const hasSession = await signUpWithPassword(
+        values,
+        async (session) => {
+          const scope = getScope();
+          scope.assertCurrent();
+          if (scope.userId !== session.user.id) throw new Error("A sessão mudou.");
+          await redeemPassengerInvite(code, scope);
+          scope.assertCurrent();
+          forgetInvite();
+          navigate("/", { replace: true });
+        },
+        `${window.location.origin}/convite`,
+      );
 
       if (!hasSession) {
         setPendingConfirmation(true);
@@ -59,6 +97,20 @@ export function InviteRedemptionPage() {
     }
   }
 
+  async function login(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitError(null);
+    const form = new FormData(event.currentTarget);
+    if (code) rememberInvite(code);
+    try {
+      await signInWithPassword({
+        email: String(form.get("email")),
+        password: String(form.get("password")),
+      });
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Falha temporária.");
+    }
+  }
   if (loading) {
     return (
       <div className="flex min-h-svh items-center justify-center">
@@ -74,7 +126,7 @@ export function InviteRedemptionPage() {
         <div className="surface mt-8 p-8">
           <h1 className="text-2xl font-semibold tracking-tight">RideLedger</h1>
           <p className="mt-1 text-sm opacity-70">
-            Crie sua conta para acompanhar suas diárias.
+            Use o convite para acompanhar suas diárias.
           </p>
 
           {user ? (
@@ -83,8 +135,12 @@ export function InviteRedemptionPage() {
                 Você já está logado como <strong>{user.email}</strong>.
               </p>
               <p className="text-sm opacity-70">
-                Saia da conta atual para usar este código de convite.
+                Confirme para vincular esta conta ao convite.
               </p>
+              <Button disabled={redeeming} onClick={redeem}>
+                {redeeming ? "Vinculando..." : "Usar convite"}
+              </Button>
+              {submitError && <p role="alert">{submitError}</p>}
               <Button variant="outline" onClick={() => signOut()}>
                 Sair
               </Button>
@@ -95,10 +151,30 @@ export function InviteRedemptionPage() {
                 Quase lá — confirme seu e-mail para ativar a conta.
               </p>
               <p className="text-sm opacity-70">
-                Depois de confirmar, acesse este mesmo link de convite de novo para
-                concluir o vínculo.
+                Após confirmar, retorne a esta página e use o convite. Se abrir em outro
+                navegador, reabra o link original.
               </p>
+              <Button
+                onClick={() => {
+                  setPendingConfirmation(false);
+                  setLoginMode(true);
+                }}
+              >
+                Já confirmei: entrar
+              </Button>
             </div>
+          ) : loginMode ? (
+            <form onSubmit={login} className="mt-6 space-y-4">
+              <Label htmlFor="login-email">E-mail</Label>
+              <Input id="login-email" name="email" type="email" required />
+              <Label htmlFor="login-password">Senha</Label>
+              <Input id="login-password" name="password" type="password" required />
+              {submitError && <p role="alert">{submitError}</p>}
+              <Button type="submit">Entrar</Button>
+              <Button type="button" variant="outline" onClick={() => setLoginMode(false)}>
+                Criar conta
+              </Button>
+            </form>
           ) : (
             <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
               <div className="space-y-1">
@@ -144,6 +220,9 @@ export function InviteRedemptionPage() {
 
               {submitError && <p className="text-xs text-destructive">{submitError}</p>}
 
+              <Button type="button" variant="outline" onClick={() => setLoginMode(true)}>
+                Já tenho conta
+              </Button>
               <Button type="submit" disabled={isSubmitting} className="w-full">
                 {isSubmitting ? "Criando conta..." : "Criar conta"}
               </Button>

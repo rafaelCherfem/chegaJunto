@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { useAuth } from "@/hooks/useAuth";
+import { PassengerInvitePanel } from "@/components/passengers/PassengerInvitePanel";
 import { InviteRedemptionPage } from "@/pages/InviteRedemptionPage";
 const mocks = vi.hoisted(() => ({
   listener: undefined as
@@ -11,6 +12,9 @@ const mocks = vi.hoisted(() => ({
     | ((event: string, session: { user: { id: string; email: string } } | null) => void),
   signup: vi.fn(),
   redeem: vi.fn(),
+  list: vi.fn(),
+  create: vi.fn(),
+  revoke: vi.fn(),
 }));
 vi.mock("@/lib/supabase", () => ({
   supabase: {
@@ -26,6 +30,9 @@ vi.mock("@/lib/supabase", () => ({
 }));
 vi.mock("@/services/passengerAccounts.service", () => ({
   redeemPassengerInvite: mocks.redeem,
+  listPassengerInvites: mocks.list,
+  createPassengerInvite: mocks.create,
+  revokePassengerInvite: mocks.revoke,
 }));
 function login(id: string) {
   mocks.listener?.("SIGNED_IN", { user: { id, email: id + "@example.test" } });
@@ -37,7 +44,11 @@ function Home() {
 async function signup() {
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <MemoryRouter initialEntries={["/convite/synthetic"]}>
+      <MemoryRouter
+        initialEntries={[
+          "/convite/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        ]}
+      >
         <AuthProvider>
           <Routes>
             <Route path="/convite/:code" element={<InviteRedemptionPage />} />
@@ -71,7 +82,7 @@ describe("invite signup continuation across Auth boundary", () => {
     await signup();
     await screen.findByText("Home A");
     expect(mocks.redeem).toHaveBeenCalledWith(
-      "synthetic",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       expect.objectContaining({ userId: "A" }),
     );
   });
@@ -101,5 +112,87 @@ describe("invite signup continuation across Auth boundary", () => {
       complete();
     });
     expect(screen.queryByText(/Home/)).toBeNull();
+  });
+});
+
+async function ownerPanel() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  mocks.list.mockImplementation(async (_id, scope) => [
+    {
+      id: scope.userId + "-invite",
+      passengerId: "target",
+      used: false,
+      createdAt: "2026-01-01T00:00:00Z",
+      expiresAt: "2099-01-08T00:00:00Z",
+      usedAt: null,
+      revokedAt: null,
+    },
+  ]);
+  render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter>
+        <AuthProvider>
+          <PassengerInvitePanel passengerId="target" />
+        </AuthProvider>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+  act(() => login("A"));
+  await screen.findByText(/Pendente ·/);
+  return client;
+}
+describe("owner invitation mutations across real Auth boundary", () => {
+  it("late creation never delivers A token or cache into B", async () => {
+    let complete!: (result: { id: string; token: string }) => void;
+    mocks.create.mockReturnValue(
+      new Promise((resolve) => {
+        complete = resolve;
+      }),
+    );
+    const client = await ownerPanel();
+    fireEvent.click(screen.getByText("Gerar novo convite"));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalled());
+    act(() => login("B"));
+    await screen.findByText(/Pendente ·/);
+    await act(async () => {
+      complete({ id: "A-invite", token: "a".repeat(64) });
+    });
+    expect(screen.queryByText("Copiar link")).toBeNull();
+    expect(
+      client
+        .getQueryCache()
+        .getAll()
+        .every((query) => query.queryKey[1] === "B"),
+    ).toBe(true);
+    expect(
+      JSON.stringify(
+        client
+          .getQueryCache()
+          .getAll()
+          .map((query) => query.state.data),
+      ),
+    ).not.toContain("A-invite");
+  });
+  it("late revocation from A does not invalidate B invitation cache", async () => {
+    let complete!: () => void;
+    mocks.revoke.mockReturnValue(
+      new Promise<void>((resolve) => {
+        complete = resolve;
+      }),
+    );
+    await ownerPanel();
+    fireEvent.click(screen.getByText("Revogar"));
+    await waitFor(() => expect(mocks.revoke).toHaveBeenCalled());
+    act(() => login("B"));
+    await screen.findByText(/Pendente ·/);
+    const callsBefore = mocks.list.mock.calls.filter(
+      (call) => call[1].userId === "B",
+    ).length;
+    await act(async () => {
+      complete();
+    });
+    expect(mocks.list.mock.calls.filter((call) => call[1].userId === "B")).toHaveLength(
+      callsBefore,
+    );
   });
 });
