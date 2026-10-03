@@ -33,9 +33,9 @@ describe("calendar helpers — current baseline", () => {
     expect(nextMonth("2024-02-01")).toBe("2024-03-01");
     expect(previousMonth("2024-03-01")).toBe("2024-02-01");
   });
-  it("uses the current device calendar for today (business timezone is future work)", () => {
+  it("uses the business calendar for today", () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date(2026, 9, 1, 12));
+    vi.setSystemTime(new Date("2026-10-01T12:00:00Z"));
     expect(todayISODate()).toBe("2026-10-01");
     expect(currentMonthStart()).toBe("2026-10-01");
     expect(referenceMonthFromDate(todayISODate())).toBe("2026-10-01");

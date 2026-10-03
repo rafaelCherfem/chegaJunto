@@ -8,8 +8,9 @@ import {
 
 const receivedRidesKey = ["receivedRides"] as const;
 
-export function useReceivedRidesByMonth(referenceMonth: string) {
+export function useReceivedRidesByMonth(referenceMonth: string, enabled = true) {
   return usePrivateQuery({
+    enabled,
     queryKey: [...receivedRidesKey, referenceMonth],
     queryFn: (scope) => listReceivedRidesByMonth(referenceMonth, undefined, scope),
   });

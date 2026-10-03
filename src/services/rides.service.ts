@@ -1,5 +1,5 @@
 import { requestSignal, type SessionScope } from "@/lib/sessionScope";
-import { addMonths, formatISO } from "date-fns";
+import { assertRecordDate, FUTURE_DATE_ERROR, monthBounds } from "@/utils/date";
 import { errorMessages } from "@/constants/errorMessages";
 import { toRide } from "@/lib/mappers";
 import { getCurrentUserId, supabase } from "@/lib/supabase";
@@ -18,10 +18,7 @@ export async function listRidesByMonth(
   passengerId?: string,
   scope?: SessionScope,
 ): Promise<Ride[]> {
-  const monthStart = referenceMonth;
-  const monthEnd = formatISO(addMonths(new Date(referenceMonth), 1), {
-    representation: "date",
-  });
+  const { start: monthStart, end: monthEnd } = monthBounds(referenceMonth);
 
   let query = supabase
     .from("rides")
@@ -47,6 +44,7 @@ export async function createRide(
   input: CreateRideInput,
   scope?: SessionScope,
 ): Promise<Ride> {
+  assertRecordDate(input.rideDate);
   const userId = await getCurrentUserId(scope);
   const passenger = await getPassenger(input.passengerId, scope);
   scope?.assertCurrent();
@@ -64,6 +62,8 @@ export async function createRide(
     .single();
 
   if (error) {
+    if (error.code === "23514" && error.message.includes("FUTURE_DATE"))
+      throw new Error(FUTURE_DATE_ERROR);
     if (error.code === UNIQUE_VIOLATION) {
       throw new Error(errorMessages.duplicateRide);
     }

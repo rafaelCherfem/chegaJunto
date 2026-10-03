@@ -341,3 +341,92 @@ tests/invite.lifecycle.test.tsx
 tests/invite.service.test.ts
 tests/invite.session.test.tsx
 ```
+
+
+## Etapa 5 — datas e competência (validação de banco pendente)
+
+Datas de negócio são datas civis Gregorianas YYYY-MM-DD, anos 0001–9999; não são
+instantes UTC. utils/date centraliza validação estrita (incluindo bissextos),
+comparação, competência YYYY-MM, reference_month YYYY-MM-01, início do mês seguinte,
+navegação de mês, formatação e hoje em America/Sao_Paulo via Intl.formatToParts.
+Nenhuma dependência foi adicionada ou atualizada. date-fns permanece instalado,
+mas saiu dos dois filtros mensais; não há mais new Date(referenceMonth).
+
+Problemas identificados: hoje e mês atual seguiam o dispositivo; os services
+somavam um mês a uma data interpretada como UTC e formatavam o resultado no
+horário local (podiam excluir o último dia); recebimentos sempre consultavam o
+mês atual; não havia bloqueio real de datas futuras, nem validação de data/competência.
+RidesPage já derivava o mês da seleção, e essa regra foi preservada.
+
+Diária/compensação aceita hoje e retroativo, mas rejeita data inválida ou futura
+antes de consultar/gravar. Inputs têm max com hoje em São Paulo, a compensação
+valida também via schema e ambos os services repetem a proteção. O erro FUTURE_DATE
+do banco é traduzido mesmo se o relógio do browser tiver permitido a data.
+Os hooks desabilitam a consulta para seleção inválida/futura. Compensações consulta
+a competência selecionada e mantém essa data após salvar. Fechamento apenas ganhou
+validação de entrada canônica; cálculos, pagamento e versionamento não mudaram.
+Todas as consultas DATE usam gte(primeiro dia) e lt(primeiro dia do próximo mês).
+
+A migration 0007 (0001–0006 intactas) adiciona triggers BEFORE INSERT/UPDATE da
+coluna civil para bloquear futuro com clock_timestamp AT TIME ZONE America/Sao_Paulo,
+independentemente do timezone SQL. A função é invoker, search_path vazio, sem
+EXECUTE direto dos clientes. CHECKs estáticos garantem datas civis representáveis e
+reference_month no dia 01. Não há CHECK temporal dependente de CURRENT_DATE.
+A migration recusa datas futuras históricas e constraints incompatíveis; não
+reescreve registros. Qualquer preparo para dados reais continua sendo etapa futura.
+
+Frontend: 138 testes aprovados (82 anteriores + 56 novos); as 11 asserções da
+baseline de data continuam, com o caso de hoje atualizado à regra aprovada.
+Quatro TODOs de datas agora são regressões executáveis; restam 10 TODO futuros.
+Foram executados os 67 testes de datas/helpers/services/páginas em processos
+UTC, America/Sao_Paulo e Asia/Tokyo: todos passaram nas três configurações.
+Há 58 novas asserções pgTAP planejadas para INSERT/UPDATE hoje/ontem/amanhã,
+UTC/São Paulo/Tóquio, bissexto, intervalos mensais e competência canônica.
+Elas AINDA NÃO foram executadas: Docker estava parado e o Desktop iniciado
+registrou erro ao iniciar o engine. A tentativa de reset não reconstruiu o banco.
+As duas reconstruções 0001→0007 e os pgTAP (211 anteriores + 58 novos esperados)
+continuam pendentes. Etapa 5 NÃO VALIDADA até concluir essa parte.
+
+TypeScript, ESLint dos arquivos alterados, build e diff-check passaram.
+O build conserva o aviso de bundle >500 kB. Nenhum commit/push/deploy foi feito.
+
+Revisão de ocorrências remanescentes em src:
+- utils/date: new Date() obtém um instante, projetado explicitamente em São Paulo;
+- monthlyCharges.service: new Date().toISOString() em paid_at é timestamp de evento,
+  seguro/intencional; nenhuma mudança no fluxo de pagamento;
+- rideFlags.service: resolved_at é timestamp de evento, seguro e fora do escopo;
+- PassengerInvitePanel: new Date(expiresAt) apresenta um timestamptz, seguro para
+  instante; a apresentação local de convites permanece fora do escopo;
+- tipos/mappers: ride_date, received_date e reference_month permanecem strings DATE,
+  sem conversão UTC; geração de PDF usa os helpers compartilhados, sem edição de PDF;
+- não há gráficos/estatísticas com outra lógica temporal nem date-fns usado em src.
+
+Limites: relógio do dispositivo ainda pode estar incorreto, mas o banco decide
+admissão; telas longamente abertas podem precisar de atualização após a virada
+civil. DATE no PostgreSQL normaliza representações de entrada aceitas pelo próprio
+tipo; o frontend exige texto canônico. Futuras competências podem ser navegadas,
+mas não permitem criar diárias/compensações futuras. A reconstrução descartável
+não substitui análise de compatibilidade de dados reais. Não houve mudanças em
+convites, RLS, flags, exclusão, cálculo financeiro ou arquivos de PDF.
+
+Arquivos da Etapa 5 (17: 12 modificados e cinco novos):
+
+```text
+README.md
+src/hooks/useReceivedRides.ts
+src/hooks/useRides.ts
+src/pages/CompensationsPage.tsx
+src/pages/RidesPage.tsx
+src/schemas/receivedRide.schema.ts
+src/services/monthlyCharges.service.ts
+src/services/receivedRides.service.ts
+src/services/rides.service.ts
+src/utils/date.ts
+supabase/migrations/0007_date_integrity.sql
+supabase/tests/0007_date_integrity.test.sql
+tests/date.integrity.test.ts
+tests/date.pages.test.tsx
+tests/date.services.test.ts
+tests/date.test.ts
+tests/future/hardening.spec.test.ts
+```

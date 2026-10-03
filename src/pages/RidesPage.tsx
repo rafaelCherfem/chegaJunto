@@ -4,19 +4,35 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { usePassengers } from "@/hooks/usePassengers";
 import { useCreateRide, useDeleteRide, useRidesByMonth } from "@/hooks/useRides";
-import { referenceMonthFromDate, todayISODate } from "@/utils/date";
+import {
+  assertRecordDate,
+  currentMonthStart,
+  isCalendarDate,
+  FUTURE_DATE_ERROR,
+  referenceMonthFromDate,
+  todayISODate,
+} from "@/utils/date";
 import type { Passenger, Ride } from "@/types/entities";
 
 export function RidesPage() {
   const [selectedDate, setSelectedDate] = useState(todayISODate());
-  const referenceMonth = referenceMonthFromDate(selectedDate);
+  const validDate = isCalendarDate(selectedDate);
+  const today = todayISODate();
+  const dateError = !validDate
+    ? "Informe uma data válida."
+    : selectedDate > today
+      ? FUTURE_DATE_ERROR
+      : null;
+  const referenceMonth = validDate
+    ? referenceMonthFromDate(selectedDate)
+    : currentMonthStart();
 
   const { data: passengers, isLoading: loadingPassengers } = usePassengers();
   const {
     data: rides,
     isLoading: loadingRides,
     isError: ridesError,
-  } = useRidesByMonth(referenceMonth);
+  } = useRidesByMonth(referenceMonth, !dateError);
 
   const createRide = useCreateRide();
   const deleteRide = useDeleteRide();
@@ -50,6 +66,7 @@ export function RidesPage() {
     setRegisteringId(passenger.id);
 
     try {
+      assertRecordDate(selectedDate);
       await createRide.mutateAsync({
         passengerId: passenger.id,
         rideDate: selectedDate,
@@ -78,8 +95,7 @@ export function RidesPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Diárias</h1>
         <p className="text-sm opacity-70">
-          Toque no passageiro para registrar. Use a seta para ver o histórico
-          do mês.
+          Toque no passageiro para registrar. Use a seta para ver o histórico do mês.
         </p>
       </div>
 
@@ -88,12 +104,17 @@ export function RidesPage() {
         <Input
           id="rideDate"
           type="date"
+          max={today}
           value={selectedDate}
           onChange={(event) => setSelectedDate(event.target.value)}
         />
       </div>
 
-      {rideError && <p className="text-sm text-destructive">{rideError}</p>}
+      {(dateError || rideError) && (
+        <p role="alert" className="text-sm text-destructive">
+          {dateError || rideError}
+        </p>
+      )}
 
       {loadingPassengers && (
         <p className="text-sm opacity-70">Carregando passageiros...</p>

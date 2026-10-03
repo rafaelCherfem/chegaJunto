@@ -1,3 +1,4 @@
+import { assertReferenceMonth } from "@/utils/date";
 import { requestSignal, type SessionScope } from "@/lib/sessionScope";
 import { errorMessages } from "@/constants/errorMessages";
 import { toMonthlyCharge } from "@/lib/mappers";
@@ -11,6 +12,7 @@ export async function calculateMonthlyCharges(
   referenceMonth: string,
   scope?: SessionScope,
 ): Promise<MonthlyCharge[]> {
+  assertReferenceMonth(referenceMonth);
   const userId = await getCurrentUserId(scope);
   const [rides, receivedRides] = await Promise.all([
     listRidesByMonth(referenceMonth, undefined, scope),
@@ -50,6 +52,7 @@ export async function listMonthlyCharges(
   referenceMonth: string,
   scope?: SessionScope,
 ): Promise<MonthlyCharge[]> {
+  assertReferenceMonth(referenceMonth);
   const { data, error } = await supabase
     .from("monthly_charges")
     .select("*")

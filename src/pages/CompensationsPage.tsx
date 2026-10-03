@@ -15,19 +15,19 @@ import {
   receivedRideSchema,
   type ReceivedRideFormValues,
 } from "@/schemas/receivedRide.schema";
-import { currentMonthStart, formatDateDisplay, todayISODate } from "@/utils/date";
+import {
+  currentMonthStart,
+  isCalendarDate,
+  referenceMonthFromDate,
+  formatDateDisplay,
+  todayISODate,
+  formatMonthLabel,
+} from "@/utils/date";
 import { formatCurrency } from "@/utils/currency";
 import type { ReceivedRide } from "@/types/entities";
 
 export function CompensationsPage() {
-  const referenceMonth = currentMonthStart();
-
   const { data: passengers } = usePassengers();
-  const {
-    data: receivedRides,
-    isLoading,
-    isError,
-  } = useReceivedRidesByMonth(referenceMonth);
 
   const createReceivedRide = useCreateReceivedRide();
   const deleteReceivedRide = useDeleteReceivedRide();
@@ -39,6 +39,7 @@ export function CompensationsPage() {
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<ReceivedRideFormValues>({
     resolver: zodResolver(receivedRideSchema),
@@ -48,6 +49,20 @@ export function CompensationsPage() {
       amount: 0,
     },
   });
+
+  const selectedDate = watch("receivedDate");
+  const validDate = isCalendarDate(selectedDate);
+  const referenceMonth = validDate
+    ? referenceMonthFromDate(selectedDate)
+    : currentMonthStart();
+  const {
+    data: receivedRides,
+    isLoading,
+    isError,
+  } = useReceivedRidesByMonth(
+    referenceMonth,
+    validDate && selectedDate <= todayISODate(),
+  );
 
   const passengerNames: Record<string, string> = {};
   for (const passenger of passengers ?? []) {
@@ -61,7 +76,7 @@ export function CompensationsPage() {
       await createReceivedRide.mutateAsync(values);
       reset({
         passengerId: values.passengerId,
-        receivedDate: todayISODate(),
+        receivedDate: values.receivedDate,
         amount: 0,
       });
     } catch (error) {
@@ -90,15 +105,12 @@ export function CompensationsPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Compensações</h1>
         <p className="text-sm opacity-70">
-          Registre quando um passageiro te deu uma carona — o valor é
-          abatido do que ele deve no mês.
+          Registre quando um passageiro te deu uma carona — o valor é abatido do que ele
+          deve no mês.
         </p>
       </div>
 
-      <form
-        onSubmit={handleSubmit(onSubmit)}
-        className="surface space-y-4 p-4"
-      >
+      <form onSubmit={handleSubmit(onSubmit)} className="surface space-y-4 p-4">
         <div className="space-y-1">
           <Label htmlFor="passengerId">Passageiro</Label>
           <select
@@ -114,19 +126,20 @@ export function CompensationsPage() {
             ))}
           </select>
           {errors.passengerId && (
-            <p className="text-xs text-destructive">
-              {errors.passengerId.message}
-            </p>
+            <p className="text-xs text-destructive">{errors.passengerId.message}</p>
           )}
         </div>
 
         <div className="space-y-1">
           <Label htmlFor="receivedDate">Data</Label>
-          <Input id="receivedDate" type="date" {...register("receivedDate")} />
+          <Input
+            id="receivedDate"
+            type="date"
+            max={todayISODate()}
+            {...register("receivedDate")}
+          />
           {errors.receivedDate && (
-            <p className="text-xs text-destructive">
-              {errors.receivedDate.message}
-            </p>
+            <p className="text-xs text-destructive">{errors.receivedDate.message}</p>
           )}
         </div>
 
@@ -144,9 +157,7 @@ export function CompensationsPage() {
           )}
         </div>
 
-        {submitError && (
-          <p className="text-xs text-destructive">{submitError}</p>
-        )}
+        {submitError && <p className="text-xs text-destructive">{submitError}</p>}
 
         <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? "Registrando..." : "Registrar carona recebida"}
@@ -155,7 +166,7 @@ export function CompensationsPage() {
 
       <div className="space-y-2">
         <h2 className="text-sm font-semibold opacity-70">
-          Registradas neste mês
+          Registradas em {formatMonthLabel(referenceMonth)}
         </h2>
 
         {isLoading && <p className="text-sm opacity-70">Carregando...</p>}

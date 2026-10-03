@@ -11,10 +11,8 @@ describe("future specification — not implemented", () => {
   it.todo("different nonzero total reopens PENDENTE and preserves settlement history");
   it.todo("removing all entries recalculates an existing charge to zero");
   it.todo("each competence is independent; negative balance does not carry forward");
-  it.todo("future dates are rejected; today and past dates are accepted");
-  it.todo("today follows America/Sao_Paulo even when the device timezone differs");
-  it.todo("invalid calendar dates and noncanonical competences are rejected");
-  it.todo("monthly service boundaries include the last day without UTC/local shifts");
+  // The four date specifications are implemented in date.integrity, date.services,
+  // date.pages and 0007_date_integrity pgTAP; they are no longer future TODOs.
   // Mocked Auth/React Query isolation is implemented in session.characterization.
   // The remaining session specification requires real Auth and browser tabs.
   it.todo("real Supabase Auth across two browser tabs never exposes A data to B");

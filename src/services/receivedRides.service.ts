@@ -1,5 +1,5 @@
 import { requestSignal, type SessionScope } from "@/lib/sessionScope";
-import { addMonths, formatISO } from "date-fns";
+import { assertRecordDate, FUTURE_DATE_ERROR, monthBounds } from "@/utils/date";
 import { errorMessages } from "@/constants/errorMessages";
 import { toReceivedRide } from "@/lib/mappers";
 import { getCurrentUserId, supabase } from "@/lib/supabase";
@@ -16,10 +16,7 @@ export async function listReceivedRidesByMonth(
   passengerId?: string,
   scope?: SessionScope,
 ): Promise<ReceivedRide[]> {
-  const monthStart = referenceMonth;
-  const monthEnd = formatISO(addMonths(new Date(referenceMonth), 1), {
-    representation: "date",
-  });
+  const { start: monthStart, end: monthEnd } = monthBounds(referenceMonth);
 
   let query = supabase
     .from("received_rides")
@@ -45,6 +42,7 @@ export async function createReceivedRide(
   input: CreateReceivedRideInput,
   scope?: SessionScope,
 ): Promise<ReceivedRide> {
+  assertRecordDate(input.receivedDate);
   const userId = await getCurrentUserId(scope);
 
   const { data, error } = await supabase
@@ -60,6 +58,8 @@ export async function createReceivedRide(
     .single();
 
   if (error) {
+    if (error.code === "23514" && error.message.includes("FUTURE_DATE"))
+      throw new Error(FUTURE_DATE_ERROR);
     throw new Error(errorMessages.unexpected);
   }
 
