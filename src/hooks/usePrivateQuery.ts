@@ -33,6 +33,7 @@ export function usePrivateQuery<T>(options: {
 export function usePrivateMutation<T, V>(options: {
   mutationFn: (variables: V, scope: SessionScope) => Promise<T>;
   invalidate?: readonly unknown[];
+  invalidateAlso?: ReadonlyArray<readonly unknown[]>;
 }) {
   const { scope } = useAuth();
   const client = useQueryClient();
@@ -49,9 +50,9 @@ export function usePrivateMutation<T, V>(options: {
     },
     onSuccess: () => {
       if (!scope.signal.aborted && options.invalidate) {
-        return client.invalidateQueries({
-          queryKey: privateQueryKeys.resource(scope.userId, options.invalidate),
-        });
+        return Promise.all([options.invalidate, ...(options.invalidateAlso ?? [])].map((resource) =>
+          client.invalidateQueries({ queryKey: privateQueryKeys.resource(scope.userId, resource) }),
+        ));
       }
     },
     retry: false,

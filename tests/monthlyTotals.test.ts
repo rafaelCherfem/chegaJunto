@@ -6,10 +6,10 @@ const compensation = (amount: number, passengerId = "A") => ({ passengerId, amou
 
 describe("monthly totals — current baseline", () => {
   it("100 in rides minus 20 in compensations is 80", () => {
-    expect(totalsByPassenger([ride(40), ride(60)], [compensation(20)]).get("A")).toBe(80);
+    expect(totalsByPassenger([ride(40), ride(60)], [compensation(20)]).get("A")).toBe(8000);
   });
   it("60 minus 80 is -20, owed by the responsible account", () => {
-    expect(totalsByPassenger([ride(60)], [compensation(80)]).get("A")).toBe(-20);
+    expect(totalsByPassenger([ride(60)], [compensation(80)]).get("A")).toBe(-2000);
   });
   it("zero rides and zero compensations yield zero when a passenger exists", () => {
     expect(totalsByPassenger([ride(0)], [compensation(0)]).get("A")).toBe(0);
@@ -26,21 +26,16 @@ describe("monthly totals — current baseline", () => {
         [compensation(20), compensation(60, "B")],
       ),
     ]).toEqual([
-      ["A", 80],
-      ["B", -10],
+      ["A", 8000],
+      ["B", -1000],
     ]);
   });
   it("supports a passenger with compensations only", () => {
-    expect(totalsByPassenger([], [compensation(20)]).get("A")).toBe(-20);
+    expect(totalsByPassenger([], [compensation(20)]).get("A")).toBe(-2000);
   });
-  it("documents decimal drift without silently changing current arithmetic", () => {
-    const total = totalsByPassenger([ride(0.1), ride(0.2)], []).get("A")!;
-    expect(total).not.toBe(0.3);
-    expect(total).toBeCloseTo(0.3, 12);
-    expect(Math.round(total * 100)).toBe(30);
-  });
-  it("rounds the display equivalent of 0.30 minus 0.10 to 20 cents", () => {
+  it("computes 0.10 + 0.20 as exactly 30 cents", () => { expect(totalsByPassenger([ride(0.1),ride(0.2)],[]).get("A")).toBe(30); });
+  it("computes exact integer cents of 0.30 minus 0.10 to 20 cents", () => {
     const total = totalsByPassenger([ride(0.3)], [compensation(0.1)]).get("A")!;
-    expect(Math.round(total * 100)).toBe(20);
+    expect(total).toBe(20);
   });
 });

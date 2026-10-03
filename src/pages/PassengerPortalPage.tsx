@@ -1,5 +1,6 @@
 import { Flag, LogOut } from "lucide-react";
 import { useMemo, useState } from "react";
+import { addCents, toCents } from "@/utils/money";
 import { CarIllustration } from "@/components/illustrations/CarIllustration";
 import { Button } from "@/components/ui/button";
 import { usePassenger } from "@/hooks/usePassengers";
@@ -33,7 +34,7 @@ export function PassengerPortalPage({ passengerId }: PassengerPortalPageProps) {
   const [flagError, setFlagError] = useState<string | null>(null);
 
   const rideTotal = useMemo(
-    () => (rides ?? []).reduce((sum, ride) => sum + ride.rateCharged, 0),
+    () => (rides ?? []).reduce((sum, ride) => addCents(sum, toCents(ride.rateCharged)), 0),
     [rides],
   );
 
@@ -41,11 +42,11 @@ export function PassengerPortalPage({ passengerId }: PassengerPortalPageProps) {
     () =>
       (receivedRides ?? [])
         .filter((received) => received.passengerId === passengerId)
-        .reduce((sum, received) => sum + received.amount, 0),
+        .reduce((sum, received) => addCents(sum, toCents(received.amount)), 0),
     [receivedRides, passengerId],
   );
 
-  const previewTotal = rideTotal - compensationTotal;
+  const previewTotal = addCents(rideTotal, -compensationTotal);
 
   const sortedRides = useMemo(
     () => [...(rides ?? [])].sort((a, b) => (a.rideDate < b.rideDate ? 1 : -1)),
@@ -96,12 +97,12 @@ export function PassengerPortalPage({ passengerId }: PassengerPortalPageProps) {
                 Prévia de {formatMonthLabel(referenceMonth)}
               </p>
               <p className="mt-1 text-3xl font-semibold tracking-tight">
-                {formatCurrency(previewTotal)}
+                {formatCurrency(previewTotal / 100)}
               </p>
               {compensationTotal > 0 && (
                 <p className="mt-1 text-xs opacity-70">
-                  Diárias: {formatCurrency(rideTotal)} · Compensação: −
-                  {formatCurrency(compensationTotal)}
+                  Diárias: {formatCurrency(rideTotal / 100)} · Compensação: −
+                  {formatCurrency(compensationTotal / 100)}
                 </p>
               )}
               <p className="mt-2 text-xs opacity-60">

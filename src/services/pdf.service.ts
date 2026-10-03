@@ -1,5 +1,6 @@
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import { formatCurrency } from "@/utils/currency";
+import { debtLabel, toCents } from "@/utils/money";
 import { formatDateDisplay, formatMonthLabel, todayISODate } from "@/utils/date";
 import type { MonthlyCharge, Passenger, Ride } from "@/types/entities";
 
@@ -75,20 +76,15 @@ export async function generateMonthlyReceipt({
     size: 14,
   });
 
-  const remaining = Math.max(
-    0,
-    Math.round((charge.totalAmount - charge.paidAmount) * 100) / 100,
-  );
-
-  if (charge.paidAmount > 0) {
+  const cents = toCents(charge.totalAmount);
+  writeLine(debtLabel(cents), { size: 11 });
+  if (charge.paid && cents !== 0) {
     writeLine(`Pago: ${formatCurrency(charge.paidAmount)}`, { size: 11 });
   }
 
   writeLine(
-    remaining > 0
-      ? `Pendente: ${formatCurrency(remaining)}`
-      : "Situação: pago integralmente",
-    { size: 11, bold: remaining === 0 },
+    cents === 0 ? "Situação: sem obrigação" : charge.paid ? "Situação: pago integralmente" : "Situação: pendente",
+    { size: 11, bold: charge.paid },
   );
 
   cursorY -= 16;

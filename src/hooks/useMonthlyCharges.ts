@@ -25,15 +25,15 @@ export function useCalculateMonthlyCharges() {
 
 export function useMarkMonthlyChargePaid() {
   return usePrivateMutation({
-    mutationFn: ({ id, amount }: { id: string; amount: number }, scope) =>
-      markMonthlyChargePaid(id, amount, scope),
+    mutationFn: ({ id, revision }: { id: string; revision: number }, scope) =>
+      markMonthlyChargePaid(id, revision, scope),
     invalidate: monthlyChargesKey,
   });
 }
 
 export function useUnmarkMonthlyChargePaid() {
   return usePrivateMutation({
-    mutationFn: (id: string, scope) => unmarkMonthlyChargePaid(id, scope),
+    mutationFn: ({ id, paymentId }: { id: string; paymentId: string }, scope) => unmarkMonthlyChargePaid(id, paymentId, scope),
     invalidate: monthlyChargesKey,
   });
 }

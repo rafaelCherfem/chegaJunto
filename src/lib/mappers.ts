@@ -58,6 +58,8 @@ export function toPassengerInvite(row: PassengerInviteRow): PassengerInvite {
 
 export function toMonthlyCharge(row: MonthlyChargeRow): MonthlyCharge {
   return {
+    revision: row.revision,
+    activePaymentId: row.active_payment_id,
     id: row.id,
     passengerId: row.passenger_id,
     referenceMonth: row.reference_month,

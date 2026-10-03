@@ -3,6 +3,7 @@ import { errorMessages } from "@/constants/errorMessages";
 import { toPassenger } from "@/lib/mappers";
 import { getCurrentUserId, supabase } from "@/lib/supabase";
 import type { Passenger } from "@/types/entities";
+import { toCents } from "@/utils/money";
 
 export interface CreatePassengerInput {
   name: string;
@@ -56,6 +57,7 @@ export async function createPassenger(
   input: CreatePassengerInput,
   scope?: SessionScope,
 ): Promise<Passenger> {
+  toCents(input.defaultDailyRate);
   const userId = await getCurrentUserId(scope);
 
   const { data, error } = await supabase
@@ -81,6 +83,7 @@ export async function updatePassenger(
   input: UpdatePassengerInput,
   scope?: SessionScope,
 ): Promise<Passenger> {
+  if (input.defaultDailyRate !== undefined) toCents(input.defaultDailyRate);
   const { data, error } = await supabase
     .from("passengers")
     .update({

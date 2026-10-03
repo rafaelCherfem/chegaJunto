@@ -69,6 +69,9 @@ export interface Database {
       };
       monthly_charges: {
         Row: {
+          revision: number;
+          active_payment_id: string | null;
+          recalculated_at: string;
           id: string;
           user_id: string;
           passenger_id: string;
@@ -214,6 +217,9 @@ export interface Database {
     };
     Views: Record<string, never>;
     Functions: {
+      close_month: { Args: { month_date: string }; Returns: Database["public"]["Tables"]["monthly_charges"]["Row"][] };
+      pay_charge: { Args: { target_charge: string; expected_revision: number }; Returns: Database["public"]["Tables"]["monthly_charges"]["Row"][] };
+      cancel_charge_payment: { Args: { target_charge: string; target_payment: string }; Returns: Database["public"]["Tables"]["monthly_charges"]["Row"][] };
       is_responsible: { Args: Record<string, never>; Returns: boolean };
       create_passenger_invite: {
         Args: { target_passenger: string; invite_token: string };

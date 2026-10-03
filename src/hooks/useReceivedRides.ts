@@ -21,6 +21,7 @@ export function useCreateReceivedRide() {
     mutationFn: (input: CreateReceivedRideInput, scope) =>
       createReceivedRide(input, scope),
     invalidate: receivedRidesKey,
+    invalidateAlso: [["monthlyCharges"]],
   });
 }
 
@@ -28,5 +29,6 @@ export function useDeleteReceivedRide() {
   return usePrivateMutation({
     mutationFn: (id: string, scope) => deleteReceivedRide(id, scope),
     invalidate: receivedRidesKey,
+    invalidateAlso: [["monthlyCharges"]],
   });
 }

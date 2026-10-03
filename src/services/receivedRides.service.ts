@@ -1,5 +1,6 @@
 import { requestSignal, type SessionScope } from "@/lib/sessionScope";
 import { assertRecordDate, FUTURE_DATE_ERROR, monthBounds } from "@/utils/date";
+import { toCents } from "@/utils/money";
 import { errorMessages } from "@/constants/errorMessages";
 import { toReceivedRide } from "@/lib/mappers";
 import { getCurrentUserId, supabase } from "@/lib/supabase";
@@ -43,6 +44,7 @@ export async function createReceivedRide(
   scope?: SessionScope,
 ): Promise<ReceivedRide> {
   assertRecordDate(input.receivedDate);
+  toCents(input.amount);
   const userId = await getCurrentUserId(scope);
 
   const { data, error } = await supabase

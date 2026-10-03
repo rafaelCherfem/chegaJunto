@@ -3,14 +3,8 @@ import { describe, it } from "vitest";
 // Executable backlog: TODO cases are reported separately, never claimed as
 // passing coverage. Implement assertions against real code in later stages.
 describe("future specification — not implemented", () => {
-  it.todo("money is computed in integer cents: 0.10 + 0.20 is exactly 30 cents");
-  it.todo("positive total means passenger owes responsible; negative reverses debtor");
-  it.todo("zero means no obligation and closed/PAGO without a payment event");
-  it.todo("PENDENTE becomes PAGO only by integral settlement of its version");
-  it.todo("recalculation with identical total preserves payment state");
-  it.todo("different nonzero total reopens PENDENTE and preserves settlement history");
-  it.todo("removing all entries recalculates an existing charge to zero");
-  it.todo("each competence is independent; negative balance does not carry forward");
+  // Eight financial specifications are now exercised in financial.*, monthlyTotals,
+  // 0008_financial_integrity pgTAP and the real PostgreSQL concurrency script.
   // The four date specifications are implemented in date.integrity, date.services,
   // date.pages and 0007_date_integrity pgTAP; they are no longer future TODOs.
   // Mocked Auth/React Query isolation is implemented in session.characterization.

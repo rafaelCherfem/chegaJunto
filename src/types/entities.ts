@@ -43,6 +43,8 @@ export interface FlaggedRide {
 }
 
 export interface MonthlyCharge {
+  revision: number;
+  activePaymentId: string | null;
   id: string;
   passengerId: string;
   referenceMonth: string;

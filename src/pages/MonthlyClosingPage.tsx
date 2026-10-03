@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { addCents, toCents } from "@/utils/money";
 import { MonthlyChargeCard } from "@/components/charges/MonthlyChargeCard";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,7 +21,7 @@ import {
 import type { MonthlyCharge, Passenger } from "@/types/entities";
 
 function amountsMatch(a: number, b: number): boolean {
-  return Math.round(a * 100) === Math.round(b * 100);
+  return toCents(a) === toCents(b);
 }
 
 export function MonthlyClosingPage() {
@@ -59,7 +60,7 @@ export function MonthlyClosingPage() {
     for (const ride of rides ?? []) {
       totals.set(
         ride.passengerId,
-        (totals.get(ride.passengerId) ?? 0) + ride.rateCharged,
+        addCents(totals.get(ride.passengerId) ?? 0, toCents(ride.rateCharged)),
       );
     }
     return totals;
@@ -70,7 +71,7 @@ export function MonthlyClosingPage() {
     for (const received of receivedRides ?? []) {
       totals.set(
         received.passengerId,
-        (totals.get(received.passengerId) ?? 0) + received.amount,
+        addCents(totals.get(received.passengerId) ?? 0, toCents(received.amount)),
       );
     }
     return totals;
@@ -105,12 +106,12 @@ export function MonthlyClosingPage() {
     }
   }
 
-  async function handleMarkPaid(chargeId: string, amount: number) {
+  async function handleMarkPaid(chargeId: string, revision: number) {
     setActionError(null);
     setTogglingId(chargeId);
 
     try {
-      await markPaid.mutateAsync({ id: chargeId, amount });
+      await markPaid.mutateAsync({ id: chargeId, revision });
     } catch (error) {
       setActionError(
         error instanceof Error
@@ -122,12 +123,12 @@ export function MonthlyClosingPage() {
     }
   }
 
-  async function handleUnmarkPaid(chargeId: string) {
+  async function handleUnmarkPaid(chargeId: string, paymentId: string) {
     setActionError(null);
     setTogglingId(chargeId);
 
     try {
-      await unmarkPaid.mutateAsync(chargeId);
+      await unmarkPaid.mutateAsync({ id: chargeId, paymentId });
     } catch (error) {
       setActionError(
         error instanceof Error
@@ -208,9 +209,9 @@ export function MonthlyClosingPage() {
 
       <div className="space-y-2">
         {passengerIds.map((passengerId) => {
-          const rideAmount = rideTotals.get(passengerId) ?? 0;
-          const compensationAmount = compensationTotals.get(passengerId) ?? 0;
-          const computed = rideAmount - compensationAmount;
+          const rideAmount = (rideTotals.get(passengerId) ?? 0) / 100;
+          const compensationAmount = (compensationTotals.get(passengerId) ?? 0) / 100;
+          const computed = addCents(rideTotals.get(passengerId) ?? 0, -(compensationTotals.get(passengerId) ?? 0)) / 100;
           const stored = chargesByPassenger.get(passengerId);
           const passenger = passengersById.get(passengerId);
           const passengerName = passenger?.name ?? "Passageiro";
@@ -224,7 +225,7 @@ export function MonthlyClosingPage() {
                 status="preview"
                 rideAmount={rideAmount}
                 compensationAmount={compensationAmount}
-                paidAmount={0}
+                paid={false}
                 toggling={false}
                 generatingReceipt={false}
                 onMarkPaid={() => {}}
@@ -245,11 +246,11 @@ export function MonthlyClosingPage() {
               computedAmount={outdated ? computed : undefined}
               rideAmount={rideAmount}
               compensationAmount={compensationAmount}
-              paidAmount={stored.paidAmount}
+              paid={stored.paid}
               toggling={togglingId === stored.id}
               generatingReceipt={generatingId === stored.id}
-              onMarkPaid={() => handleMarkPaid(stored.id, stored.totalAmount)}
-              onUnmarkPaid={() => handleUnmarkPaid(stored.id)}
+              onMarkPaid={() => handleMarkPaid(stored.id, stored.revision)}
+              onUnmarkPaid={() => stored.activePaymentId && handleUnmarkPaid(stored.id, stored.activePaymentId)}
               onGenerateReceipt={() =>
                 passenger && handleGenerateReceipt(passenger, stored)
               }

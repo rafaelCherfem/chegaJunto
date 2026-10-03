@@ -430,3 +430,109 @@ tests/date.services.test.ts
 tests/date.test.ts
 tests/future/hardening.spec.test.ts
 ```
+
+## Etapa 6 — fechamento financeiro e pagamentos (VALIDADA LOCALMENTE)
+
+Estado em 2026-10-03: ETAPA 6 VALIDADA em Supabase/PostgreSQL exclusivamente local. Nenhum commit/push/deploy. Validação local não aplica a migration em produção.
+
+### Investigação e modelo
+
+Antes, o frontend lia diárias/compensações em chamadas separadas, somava números decimais e fazia upsert das cobranças. Passageiros sem lançamentos atuais não entravam no recálculo, deixando valores antigos. O upsert não reconciliava a quitação com o novo total. Marcar pagamento aceitava valor e horário do navegador; desmarcar sobrescrevia os dados. UI/PDF tratavam saldo negativo como ausência de dívida e inferiam pagamentos parciais. Não existiam locks, versão ou histórico financeiro.
+
+A migration nova `0008_financial_integrity.sql` implementa o cálculo NUMERIC a partir dos lançamentos persistidos. O domínio de cálculo do frontend usa centavos inteiros seguros; `toCents` valida a representação decimal, sem Math.round para esconder precisão inválida. Valores decimais de transporte e formatação são convertidos nas bordas. Valores não finitos são rejeitados. As oito caracterizações de totais continuam existindo, agora com expectativas em centavos, incluindo 0,10 + 0,20 = 30.
+
+Saldo positivo indica passageiro devedor; negativo indica responsável devedor; zero significa ausência de obrigação. Meses são independentes, sem transporte ou pagamentos parciais. Zero fica efetivamente quitado, sem evento de pagamento ou pagamento ativo para cancelar.
+
+`monthly_charges` mantém a projeção atual, revision, active_payment_id e recalculated_at. `monthly_charge_events` mantém eventos PAYMENT, CANCEL e REOPEN, com valor assinado, competência, identidade do responsável/passageiro, versão e horário do servidor. CANCEL/REOPEN apontam para a quitação original. Clientes normais não podem inserir, atualizar ou apagar eventos, nem escrever diretamente nas cobranças. O histórico permite distinguir nunca paga, quitada, cancelada manualmente e reaberta automaticamente.
+
+RPCs externas: `close_month`, `recalculate_charge`, `pay_charge`, `cancel_charge_payment`. Todas verificam authenticated/responsável e owner. Não recebem valor, status ou horário do cliente. Pagamento recebe a versão esperada; cancelamento recebe o identificador exato da quitação ativa. Repetição da mesma operação é idempotente, sem duplicar eventos; um cancelamento antigo não pode afetar uma nova quitação.
+
+Lock transacional por responsável, adquirido antes de acessar a cobrança. Escritas normais autenticadas em rides/received_rides adquirem o mesmo lock em trigger BEFORE STATEMENT, antes dos locks de linha. Operações financeiras exigem READ COMMITTED para snapshots atualizados depois da espera. As RPCs usam SECURITY DEFINER com search_path vazio, objetos de aplicação qualificados e EXECUTE negado a PUBLIC/anon; helpers internos também não são executáveis por authenticated. Eventos têm RLS de leitura restrita ao responsável correto. A chave composta mantém owner, passageiro e competência coerentes.
+
+Fechamento inclui passageiros com diárias, compensações OU cobrança existente. Excluir todos os lançamentos mantém o fechamento e recalcula zero. Criação/edição/exclusão de lançamentos atualiza cobranças já fechadas na mesma transação; competências ainda não fechadas continuam como prévia. Alterar a tarifa padrão não modifica diárias históricas. O caminho administrativo privilegiado dos fixtures não dispara atualização automática: o recálculo explícito sempre lê os dados persistidos atuais.
+
+Paga + mesmo total preserva a quitação e versão. Novo total diferente incrementa a versão e remove a quitação ativa da projeção, preservando o evento original e criando REOPEN; não cria CANCEL. Novo total não zero fica pendente, incluindo aumento, redução e troca de direção. Novo total zero fica sem obrigação. Cancelamento manual registra CANCEL, preserva o PAYMENT original e reabre a obrigação não zero com nova versão, sem alterar os lançamentos ou o total.
+
+A UI mantém o desenho existente, representa a direção da dívida, permite pagamento/cancelamento de saldos positivos e negativos e não exibe pagamento de zero. Cobrança desatualizada não pode ser paga/cancelada na UI. O comprovante consome a mesma semântica, sem saldo parcial fictício. Mutations preservam o escopo private/userId e guardas de sessão. Escritas em lançamentos invalidam também monthlyCharges no escopo capturado.
+
+### Evidência executada
+
+Após uma execução inicial aprovada, as assertions do script foram ampliadas para comprovar versão, projeção, valores persistidos, unicidade e preservação de todos os eventos por cenário. Os oito TODOs financeiros cobertos foram retirados. Depois desses ajustes foram executadas DUAS reconstruções limpas completas com a versão final dos testes.
+
+| Verificação | Primeira reconstrução final | Segunda reconstrução final |
+| --- | --- | --- |
+| Migrations 0001→0008 | PASS, todas aplicadas em banco vazio | PASS, todas aplicadas em banco vazio |
+| pgTAP | 353/353, 0 failures/skip/TODO | 353/353, 0 failures/skip/TODO |
+| Asserções anteriores | 269 preservadas | 269 preservadas |
+| Asserções novas | 84 aprovadas | 84 aprovadas |
+| Concorrência PostgreSQL real | 7/7 com duas sessões bloqueadas em barreira | 7/7 com duas sessões bloqueadas em barreira |
+| Deadlock/duplicação | Nenhum | Nenhum |
+
+Resultados observados das duas sessões por cenário (OK é sucesso; STALE é rejeição esperada de operação antiga com STALE_OBLIGATION, não falha do teste):
+
+| Cenário | Sessões da primeira execução final | Sessões da segunda execução final | Estado final em ambas | PAYMENT/CANCEL/REOPEN |
+| --- | --- | --- | --- | --- |
+| A fechamento simultâneo | OK / OK | OK / OK | revisão 1, +10,00, pendente, sem pagamento ativo | 0/0/0 |
+| B pagamento duplicado | OK / OK | OK / OK | revisão 1, +10,00, paga, um pagamento ativo | 1/0/0 |
+| C pagamento versus recálculo | STALE / OK | STALE / OK | revisão 4, +20,00, pendente, sem pagamento ativo | 3/2/1 |
+| D edição versus fechamento | OK / OK | OK / OK | revisão 5, +30,00, pendente, sem pagamento ativo | 3/2/1 |
+| E cancelamento duplicado | OK / OK | OK / OK | revisão 2, +10,00, pendente, sem pagamento ativo | 1/1/0 |
+| F pagamento versus cancelamento | OK / OK | OK / OK | revisão 3, +10,00, pendente, sem pagamento ativo | 2/2/0 |
+| G nova quitação versus cancelamento antigo | OK / OK | OK / STALE | revisão 3, +10,00, paga, nova quitação ativa | 3/2/0 |
+
+As contagens são cumulativas, na ordem de execução A, B, E, F, G, C, D. Em G, a resposta ao cancelamento antigo depende da ordem de aquisição do lock: repetição idempotente antes da nova quitação ou rejeição após ela. O estado financeiro final é o mesmo: nova quitação preservada. Não há duas reversões ou pagamentos da mesma revisão.
+
+O script confere as duas sessões, rejeita qualquer erro não esperado (incluindo deadlock/timeout), compara o saldo com lançamentos persistidos, valida a revisão exata e a projeção paid/paid_amount/paid_at/active_payment_id. Também verifica contagens de eventos, unicidade por revisão/quitação, referência e sinal do evento original, horário, owner/passageiro/competência e imutabilidade dos eventos já observados. A tentativa adicional de cancelar uma quitação antiga preservou a quitação nova. Os fixtures foram removidos ao final: rides, received_rides, monthly_charges, monthly_charge_events e sessões finance-race remanescentes = 0.
+
+No pgTAP foram efetivamente comprovados: NUMERIC/centavos exatos; positivo/negativo/zero; somente diárias; somente compensações; múltiplos lançamentos; exclusão de tudo→zero com fechamento preservado; paga+mesmo total→paga; aumento/redução→pendente; paga→zero sem obrigação; mudanças de direção→pendente; quitação integral positiva e negativa; rejeição de pagamento/cancelamento de zero; repetição idempotente; PAYMENT intacto após CANCEL/REOPEN; reabertura automática diferente de cancelamento manual; bloqueio de versão/quitação antiga; outro owner, passageiro, unlinked e anon rejeitados; RLS/grants e competências inválidas.
+
+- Frontend: **177 aprovados + 2 TODO**, após as duas reconstruções. Baseline de 177 aprovados mantido.
+- TODOs: oito financeiros removidos somente após comprovação real. Cobertura: centavos em monthlyTotals/financial.ui; sinal e zero em financial.ui/0008 pgTAP; quitação/versionamento/recálculo/histórico/exclusão/independência entre meses em 0008 pgTAP; concorrência no script real. Restam Auth real em duas abas e flags, fora do escopo.
+- TypeScript: PASS.
+- ESLint dos arquivos alterados TS/TSX/MJS: PASS.
+- Build: PASS, com aviso existente de bundle acima de 500 kB.
+- git diff --check: PASS.
+- Correções na migration/RPC/implementação durante esta validação: **nenhuma**. Apenas assertions/evidência de testes reforçadas, TODOs cobertos retirados e este registro atualizado.
+- Migrations 0001–0007: intactas em comparação com HEAD, considerando normalização de finais de linha; 0008 é a única migration nova.
+- Nenhum padrão de segredo adicionado identificado no diff/arquivos novos. Supabase .temp/start-secrets e dist permanecem ignorados; nenhum temporário ou credencial local incluído.
+
+### Riscos e estado de revisão
+
+A migration falha explicitamente se encontrar quitações preexistentes: histórico legado exige plano de migração separado, sem inventar eventos ou sobrescrever dados. O lock por responsável prioriza consistência e serializa operações em competências diferentes do mesmo responsável. Exceder numeric(10,2) falha na transação, sem arredondamento de totais. Nenhuma migration ou mudança de dados foi aplicada em produção.
+
+Branch hardening/security-reliability, HEAD 3cf230609f34c0fa50aa396c48bb10441e56ddf6, staging vazio, **32 arquivos locais** para revisão (31 do baseline + tests/future/hardening.spec.test.ts, cuja alteração reflete os TODOs implementados). Nenhum commit/push; main permanece 25cd2673bbe2b0742139efdcd9075b540c67e9f8. Produção e Vercel intocados, sem vínculo com Supabase remoto.
+
+### Arquivos locais desta etapa
+
+- `README.md`
+- `scripts/test-financial-concurrency.mjs`
+- `src/components/charges/MonthlyChargeCard.tsx`
+- `src/hooks/useMonthlyCharges.ts`
+- `src/hooks/usePrivateQuery.ts`
+- `src/hooks/useReceivedRides.ts`
+- `src/hooks/useRides.ts`
+- `src/lib/mappers.ts`
+- `src/pages/MonthlyClosingPage.tsx`
+- `src/pages/PassengerPortalPage.tsx`
+- `src/schemas/receivedRide.schema.ts`
+- `src/services/monthlyCharges.service.ts`
+- `src/services/passengers.service.ts`
+- `src/services/pdf.service.ts`
+- `src/services/receivedRides.service.ts`
+- `src/types/database.ts`
+- `src/types/entities.ts`
+- `src/utils/money.ts`
+- `src/utils/monthlyTotals.ts`
+- `supabase/migrations/0008_financial_integrity.sql`
+- `supabase/tests/0005_roles_and_isolation.test.sql`
+- `supabase/tests/0007_date_integrity.test.sql`
+- `supabase/tests/0008_financial_integrity.test.sql`
+- `tests/date.services.test.ts`
+- `tests/financial.hooks.test.tsx`
+- `tests/financial.page.test.tsx`
+- `tests/financial.services.test.ts`
+- `tests/financial.ui.test.tsx`
+- `tests/future/hardening.spec.test.ts`
+- `tests/monthlyTotals.test.ts`
+- `tests/session.characterization.test.tsx`
+- `tests/session.operations.test.ts`

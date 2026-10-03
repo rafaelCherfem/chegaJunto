@@ -32,6 +32,7 @@ export function useCreateRide() {
   return usePrivateMutation({
     mutationFn: (input: CreateRideInput, scope) => createRide(input, scope),
     invalidate: ridesKey,
+    invalidateAlso: [["monthlyCharges"]],
   });
 }
 
@@ -39,5 +40,6 @@ export function useDeleteRide() {
   return usePrivateMutation({
     mutationFn: (id: string, scope) => deleteRide(id, scope),
     invalidate: ridesKey,
+    invalidateAlso: [["monthlyCharges"]],
   });
 }

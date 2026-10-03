@@ -44,6 +44,11 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 describe("real services enforce civil dates", () => {
+  it.each([0.001, Number.NaN, Number.POSITIVE_INFINITY])("invalid precision %s cannot reach the write", async (amount) => {
+    await expect(createReceivedRide({ passengerId: "P", receivedDate: "2026-09-30", amount })).rejects.toThrow();
+    expect(mocks.from).not.toHaveBeenCalled();
+    expect(mocks.getUser).not.toHaveBeenCalled();
+  });
   it.each([listRidesByMonth, listReceivedRidesByMonth])(
     "queries use exact half-open calendar bounds",
     async (list) => {
