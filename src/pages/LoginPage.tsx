@@ -1,7 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { CarIllustration } from "@/components/illustrations/CarIllustration";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,65 +24,87 @@ export function LoginPage() {
     try {
       await signInWithPassword(values);
     } catch (error) {
-      setSubmitError(
-        error instanceof Error ? error.message : "Não foi possível entrar.",
-      );
+      setSubmitError(error instanceof Error ? error.message : "Não foi possível entrar.");
     }
   }
 
   return (
-    <div className="relative flex min-h-svh items-center justify-center overflow-hidden p-6">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute left-1/2 top-[18%] h-72 w-72 -translate-x-1/2 rounded-full opacity-40 blur-3xl"
-        style={{ backgroundColor: "hsl(var(--card))" }}
-      />
-
-      <div className="relative w-full max-w-sm">
-        <CarIllustration />
-        <div className="surface mt-8 p-8">
-          <h1 className="text-2xl font-semibold tracking-tight">RideLedger</h1>
-          <p className="mt-1 text-sm opacity-70">Entre com sua conta.</p>
-
-          <form onSubmit={handleSubmit(onSubmit)} className="mt-7 space-y-4">
-            <div className="space-y-1">
-              <Label htmlFor="email">E-mail</Label>
-              <Input
-                id="email"
-                type="email"
-                autoComplete="email"
-                {...register("email")}
-              />
-              {errors.email && (
-                <p className="text-xs text-destructive">{errors.email.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-1">
-              <Label htmlFor="password">Senha</Label>
-              <Input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                {...register("password")}
-              />
-              {errors.password && (
-                <p className="text-xs text-destructive">
-                  {errors.password.message}
-                </p>
-              )}
-            </div>
-
-            {submitError && (
-              <p className="text-xs text-destructive">{submitError}</p>
-            )}
-
-            <Button type="submit" disabled={isSubmitting} className="w-full">
-              {isSubmitting ? "Entrando..." : "Entrar"}
-            </Button>
-          </form>
+    <main className="login-layout">
+      <header className="space-y-6 lg:space-y-10">
+        <p className="wordmark text-2xl">
+          Ride<span>Ledger</span>
+        </p>
+        <div className="hidden space-y-5 lg:block">
+          <p className="max-w-xs text-3xl font-medium leading-tight tracking-tight">
+            Seu registro de caronas.
+          </p>
+          <p className="max-w-xs text-base leading-7 text-muted-foreground">
+            Diárias, compensações e fechamento mensal.
+          </p>
+          <div className="h-px w-12 bg-[hsl(var(--identity))]" aria-hidden="true" />
         </div>
-      </div>
-    </div>
+      </header>
+
+      <section className="login-form" aria-labelledby="login-title">
+        <h1 id="login-title" className="text-2xl font-semibold tracking-tight">
+          Entrar
+        </h1>
+
+        <form onSubmit={handleSubmit(onSubmit)} className="mt-7 space-y-4">
+          <div className="space-y-1">
+            <Label htmlFor="email">E-mail</Label>
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              aria-invalid={Boolean(errors.email)}
+              aria-describedby={errors.email ? "login-email-error" : undefined}
+              {...register("email")}
+            />
+            {errors.email && (
+              <p id="login-email-error" role="alert" className="text-sm text-destructive">
+                {errors.email.message}
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="password">Senha</Label>
+            <Input
+              id="password"
+              type="password"
+              autoComplete="current-password"
+              aria-invalid={Boolean(errors.password)}
+              aria-describedby={errors.password ? "login-password-error" : undefined}
+              {...register("password")}
+            />
+            {errors.password && (
+              <p
+                id="login-password-error"
+                role="alert"
+                className="text-sm text-destructive"
+              >
+                {errors.password.message}
+              </p>
+            )}
+          </div>
+
+          {submitError && (
+            <p role="alert" className="text-sm text-destructive">
+              {submitError}
+            </p>
+          )}
+
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            aria-busy={isSubmitting}
+            className="w-full"
+          >
+            {isSubmitting ? "Entrando..." : "Entrar"}
+          </Button>
+        </form>
+      </section>
+    </main>
   );
 }

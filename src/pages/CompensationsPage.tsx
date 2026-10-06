@@ -115,7 +115,7 @@ export function CompensationsPage() {
           <Label htmlFor="passengerId">Passageiro</Label>
           <select
             id="passengerId"
-            className="flex h-12 w-full rounded-md border border-black/10 bg-white/60 px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex h-12 w-full rounded-[0.5rem] border border-input bg-[hsl(var(--form-background))] px-3 py-2 text-base text-[hsl(var(--form-foreground))] outline-none focus-visible:ring-2 focus-visible:ring-ring"
             {...register("passengerId")}
           >
             <option value="">Selecione...</option>

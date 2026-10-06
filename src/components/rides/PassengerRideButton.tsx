@@ -1,5 +1,5 @@
-import { Check, ChevronDown, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Check, ChevronDown, Plus, Trash2 } from "lucide-react";
+import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/utils/currency";
 import { formatDateDisplay } from "@/utils/date";
@@ -25,63 +25,87 @@ export function PassengerRideButton({
   onDeleteRide,
 }: PassengerRideButtonProps) {
   const [expanded, setExpanded] = useState(false);
+  const historyId = useId();
 
-  const sortedRides = [...monthRides].sort((a, b) =>
-    a.rideDate < b.rideDate ? 1 : -1,
-  );
+  const sortedRides = [...monthRides].sort((a, b) => (a.rideDate < b.rideDate ? 1 : -1));
 
   return (
-    <div className="surface overflow-hidden">
-      <div className="flex items-stretch">
+    <div className="py-4">
+      <div className="space-y-1">
         <button
           type="button"
           disabled={registered || registering}
           onClick={() => onRegister(passenger)}
-          className="flex flex-1 items-center justify-between p-4 text-left transition-opacity disabled:opacity-70"
+          aria-label={`${passenger.name} ${registered ? "Registrado" : registering ? "Registrando..." : "Registrar"}`}
+          aria-busy={registering}
+          aria-describedby={`${historyId}-rate`}
+          className="ride-register-row focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
         >
-          <span className="font-medium">{passenger.name}</span>
+          <span className="col-span-2 min-w-0">
+            <span className="block break-words text-base font-semibold leading-6 [overflow-wrap:anywhere]">
+              {passenger.name}
+            </span>
+          </span>
           <span
-            className={`flex items-center gap-1 text-sm ${registered ? "font-medium text-primary" : "opacity-70"}`}
+            id={`${historyId}-rate`}
+            className="min-w-0 text-sm text-muted-foreground"
           >
-            {registered && <Check className="h-3.5 w-3.5" />}
-            {registered
-              ? "Registrado"
-              : registering
-                ? "Registrando..."
-                : "Registrar"}
+            <span className="sr-only">Diária </span>
+            <span className="text-base font-medium tabular-nums text-foreground [overflow-wrap:anywhere]">
+              {formatCurrency(passenger.defaultDailyRate)}
+            </span>
+            <span className="ml-2">padrão</span>
+          </span>
+          <span className="ride-register-action">
+            {registered && <Check aria-hidden="true" className="h-4 w-4" />}
+            {!registered && !registering && (
+              <Plus aria-hidden="true" className="h-4 w-4" />
+            )}
+            {registered ? "Registrado" : registering ? "Registrando..." : "Registrar"}
           </span>
         </button>
+
+        <div aria-live="polite" className="sr-only">
+          {registered
+            ? `${passenger.name}: diária registrada.`
+            : registering
+              ? `${passenger.name}: registrando diária.`
+              : ""}
+        </div>
 
         <button
           type="button"
           onClick={() => setExpanded((open) => !open)}
-          aria-label={
-            expanded ? "Esconder histórico do mês" : "Ver histórico do mês"
-          }
+          aria-label={expanded ? "Esconder histórico do mês" : "Ver histórico do mês"}
           aria-expanded={expanded}
-          className="flex items-center px-3"
+          aria-controls={historyId}
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-[0.5rem] px-1 text-sm font-medium text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         >
+          Histórico do mês
           <ChevronDown
-            className={`h-4 w-4 transition-transform ${expanded ? "rotate-180" : ""}`}
+            aria-hidden="true"
+            className={`h-4 w-4 transition-transform duration-150 motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`}
           />
         </button>
       </div>
 
-      {expanded && (
-        <div className="border-t border-black/10 px-4 py-3">
-          {sortedRides.length === 0 ? (
-            <p className="text-xs opacity-70">
-              Nenhuma diária registrada neste mês.
-            </p>
-          ) : (
-            <ul className="space-y-1">
-              {sortedRides.map((ride) => (
-                <li
-                  key={ride.id}
-                  className="flex items-center justify-between text-xs"
-                >
-                  <span>
-                    {formatDateDisplay(ride.rideDate)} ·{" "}
+      <div id={historyId} hidden={!expanded} className="ride-history">
+        {sortedRides.length === 0 ? (
+          <p className="py-2 text-sm text-muted-foreground">
+            Nenhuma diária registrada neste mês.
+          </p>
+        ) : (
+          <ul
+            className="divide-y divide-border/50"
+            aria-label={`Histórico de ${passenger.name}`}
+          >
+            {sortedRides.map((ride) => (
+              <li key={ride.id} className="ride-history-row">
+                <time dateTime={ride.rideDate} className="tabular-nums">
+                  {formatDateDisplay(ride.rideDate)}
+                </time>
+                <div className="ml-auto flex min-w-0 max-w-full items-center gap-3">
+                  <span className="min-w-0 text-right font-medium tabular-nums [overflow-wrap:anywhere]">
                     {formatCurrency(ride.rateCharged)}
                   </span>
                   <Button
@@ -90,15 +114,17 @@ export function PassengerRideButton({
                     disabled={deletingId === ride.id}
                     onClick={() => onDeleteRide(ride)}
                     aria-label="Remover diária"
+                    aria-busy={deletingId === ride.id}
+                    className="h-11 w-11 text-muted-foreground hover:text-destructive"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

@@ -28,8 +28,8 @@ export default defineConfig({
         name: "RideLedger",
         short_name: "RideLedger",
         description: "Controle de diárias de carona.",
-        theme_color: "#2A2035",
-        background_color: "#2A2035",
+        theme_color: "#131316",
+        background_color: "#131316",
         display: "standalone",
         start_url: "/",
         icons: [

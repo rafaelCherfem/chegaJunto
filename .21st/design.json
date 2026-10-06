@@ -1,0 +1,11 @@
+{
+  "project": "RideLedger",
+  "decisions": {
+    "direction": "Registro cotidiano, dark-first",
+    "identity": "Grafite estrutural, roxo contido, verde para registro e confirmação",
+    "typography": "Inter; valores alinhados com tabular-nums",
+    "composition": "Navegação inferior estrutural no mobile, lateral no desktop; listas contínuas",
+    "brand": "Wordmark tipográfico temporário; assets antigos preservados para decisão separada",
+    "constraints": "Somente apresentação e acessibilidade; preservar contratos, auth, datas e financeiro"
+  }
+}

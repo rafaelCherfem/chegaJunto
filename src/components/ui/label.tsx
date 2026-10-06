@@ -1,9 +1,5 @@
 import * as LabelPrimitive from "@radix-ui/react-label";
-import {
-  forwardRef,
-  type ComponentPropsWithoutRef,
-  type ElementRef,
-} from "react";
+import { forwardRef, type ComponentPropsWithoutRef, type ElementRef } from "react";
 import { cn } from "@/lib/utils";
 
 export const Label = forwardRef<
@@ -12,7 +8,10 @@ export const Label = forwardRef<
 >(({ className, ...props }, ref) => (
   <LabelPrimitive.Root
     ref={ref}
-    className={cn("text-sm font-medium leading-none", className)}
+    className={cn(
+      "text-sm font-medium leading-5 text-[hsl(var(--text-secondary))]",
+      className,
+    )}
     {...props}
   />
 ));

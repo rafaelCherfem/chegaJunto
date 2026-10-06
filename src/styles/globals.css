@@ -4,26 +4,40 @@
 
 @layer base {
   :root {
-    --background: 269 25% 17%;
-    --foreground: 0 0% 96%;
+    /* Dark-first: grafite estrutural, roxo de identidade, verde de confirmação. */
+    color-scheme: dark;
+    --background: 240 8% 8%;
+    --foreground: 240 10% 92%;
+    --identity: 270 65% 78%;
 
-    --card: 107 41% 89%;
-    --card-foreground: 0 0% 12%;
+    --card: 240 7% 11%;
+    --card-foreground: 240 10% 92%;
+    --elevated: 240 6% 15%;
+    --form-background: 240 6% 13%;
+    --form-foreground: 240 10% 92%;
+    --list-background: 240 8% 8%;
+    --text-secondary: 240 5% 72%;
+    --text-subtle: 240 4% 65%;
 
-    --primary: 112 38% 27%;
-    --primary-foreground: 0 0% 98%;
+    --primary: 270 58% 72%;
+    --primary-foreground: 270 18% 12%;
 
-    --muted: 269 20% 24%;
-    --muted-foreground: 0 0% 70%;
+    --muted: 240 6% 15%;
+    --muted-foreground: 240 5% 72%;
 
-    --border: 269 15% 30%;
-    --input: 269 15% 30%;
-    --ring: 112 40% 45%;
+    --border: 240 6% 23%;
+    --input: 240 5% 48%;
+    --ring: 270 65% 78%;
+    --confirmation: 145 40% 70%;
+    --confirmation-background: 145 16% 14%;
+    --attention: 38 65% 72%;
 
-    --destructive: 4 70% 55%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 4 70% 74%;
+    --destructive-foreground: 240 8% 10%;
 
-    --radius: 1rem;
+    --radius: 0.625rem;
+    --page-gutter: 1rem;
+    --content-width: 66rem;
   }
 
   * {
@@ -32,15 +46,205 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    line-height: 1.5;
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 3px;
+  }
+
+  @media (min-width: 640px) {
+    :root {
+      --page-gutter: 1.5rem;
+    }
   }
 }
 
 @layer components {
   .surface {
-    @apply rounded-lg border border-black/5 bg-card text-card-foreground;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.18),
-      0 18px 40px -26px rgba(0, 0, 0, 0.75);
+    @apply rounded-lg bg-card text-card-foreground;
+  }
+
+  /* Divisores antigos continuam visíveis sem reconstruir suas telas. */
+  .surface .border-black\/10 {
+    border-color: hsl(var(--border));
+  }
+
+  .wordmark {
+    @apply text-lg font-semibold tracking-tight;
+    color: hsl(var(--foreground));
+  }
+
+  .wordmark span {
+    color: hsl(var(--identity));
+  }
+
+  .app-shell__header,
+  .app-shell__content {
+    width: 100%;
+    max-width: var(--content-width);
+    margin-inline: auto;
+  }
+
+  .app-shell__header {
+    padding: calc(0.75rem + env(safe-area-inset-top, 0px)) var(--page-gutter) 0.75rem;
+  }
+
+  .app-shell__content {
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Compatibilidade das páginas antigas: a reserva da navegação é do shell. */
+  .app-shell__content > :first-child {
+    max-width: 100%;
+    padding-inline: var(--page-gutter);
+    padding-bottom: 1.5rem;
+  }
+
+  .app-shell__nav {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+
+  .app-shell__nav-list {
+    @apply mx-auto grid grid-cols-5 items-stretch;
+    max-width: var(--content-width);
+  }
+
+  .app-shell__nav-link {
+    @apply relative flex min-h-16 min-w-0 flex-col items-center justify-center gap-1 px-1 py-2 text-center text-xs font-medium text-muted-foreground transition-colors;
+  }
+
+  .app-shell__nav-link[aria-current="page"] {
+    color: hsl(var(--identity));
+    font-weight: 600;
+  }
+
+  .app-shell__nav-link[aria-current="page"]::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    width: 1.5rem;
+    height: 2px;
+    background: currentColor;
+  }
+
+  .app-shell__nav-label {
+    overflow-wrap: anywhere;
+    hyphens: auto;
+    line-height: 1.25;
+  }
+
+  .ride-list {
+    background: hsl(var(--list-background));
+  }
+
+  .ride-list > li + li {
+    border-top: 1px solid hsl(var(--border) / 0.65);
+  }
+
+  .ride-date-context {
+    @apply flex flex-wrap items-end justify-between gap-5 pb-6;
+    border-bottom: 1px solid hsl(var(--border));
+  }
+
+  .ride-register-row {
+    @apply grid min-h-16 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 rounded-lg py-1 text-left;
+  }
+
+  .ride-register-action {
+    @apply inline-flex min-h-11 items-center justify-end gap-1.5 text-sm font-semibold;
+    color: hsl(var(--confirmation));
+  }
+
+  .ride-history {
+    @apply mt-2 pl-3;
+    border-left: 2px solid hsl(var(--border));
+  }
+
+  .ride-history-row {
+    @apply grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 py-2 text-sm;
+  }
+
+  .ride-feedback {
+    @apply py-3 text-sm leading-relaxed;
+    color: hsl(var(--text-secondary));
+  }
+
+  .ride-feedback--error {
+    color: hsl(var(--destructive));
+    border-left: 3px solid currentColor;
+    padding-left: 0.75rem;
+  }
+
+  .login-layout {
+    @apply mx-auto grid min-h-svh w-full max-w-6xl content-center gap-10 px-6 py-10;
+    padding-top: calc(2.5rem + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(2.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .login-form {
+    @apply w-full max-w-sm;
+  }
+
+  @media (min-width: 1024px) {
+    .app-shell {
+      padding-left: 14rem;
+    }
+    .app-shell__content {
+      padding-bottom: 2rem;
+    }
+    .app-shell__header {
+      padding-block: 1.25rem;
+    }
+    .app-shell__nav {
+      inset: 0 auto 0 0;
+      width: 14rem;
+      padding: 2rem 1rem;
+      border-top: 0;
+      border-right: 1px solid hsl(var(--border));
+    }
+    .app-shell__nav-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    .app-shell__nav-link {
+      min-height: 3rem;
+      flex-direction: row;
+      justify-content: flex-start;
+      gap: 0.75rem;
+      padding: 0.75rem;
+      border-radius: 0.5rem;
+      font-size: 0.875rem;
+    }
+    .app-shell__nav-link[aria-current="page"] {
+      background: hsl(var(--muted));
+    }
+    .app-shell__nav-link[aria-current="page"]::before {
+      display: none;
+    }
+    .login-layout {
+      grid-template-columns: 1fr 1fr;
+      align-items: center;
+      gap: 5rem;
+      padding-inline: 3rem;
+    }
+    .login-form {
+      padding-block: 2rem;
+      justify-self: end;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation: none !important;
+      transition: none !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
-

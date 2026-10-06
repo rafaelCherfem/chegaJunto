@@ -9,6 +9,8 @@ import {
   currentMonthStart,
   isCalendarDate,
   FUTURE_DATE_ERROR,
+  formatDateDisplay,
+  formatMonthLabel,
   referenceMonthFromDate,
   todayISODate,
 } from "@/utils/date";
@@ -27,7 +29,11 @@ export function RidesPage() {
     ? referenceMonthFromDate(selectedDate)
     : currentMonthStart();
 
-  const { data: passengers, isLoading: loadingPassengers } = usePassengers();
+  const {
+    data: passengers,
+    isLoading: loadingPassengers,
+    isError: passengersError,
+  } = usePassengers();
   const {
     data: rides,
     isLoading: loadingRides,
@@ -81,73 +87,123 @@ export function RidesPage() {
   }
 
   async function handleDelete(ride: Ride) {
+    setRideError(null);
     setDeletingId(ride.id);
 
     try {
       await deleteRide.mutateAsync(ride.id);
+    } catch (error) {
+      setRideError(
+        error instanceof Error ? error.message : "Não foi possível remover a diária.",
+      );
     } finally {
       setDeletingId(null);
     }
   }
 
   return (
-    <div className="mx-auto max-w-lg space-y-6 p-6 pb-24">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Diárias</h1>
-        <p className="text-sm opacity-70">
-          Toque no passageiro para registrar. Use a seta para ver o histórico do mês.
-        </p>
-      </div>
-
-      <div className="max-w-[200px] space-y-1">
-        <Label htmlFor="rideDate">Data</Label>
-        <Input
-          id="rideDate"
-          type="date"
-          max={today}
-          value={selectedDate}
-          onChange={(event) => setSelectedDate(event.target.value)}
-        />
-      </div>
+    <div className="mx-auto space-y-6 p-6">
+      <header className="space-y-5">
+        <h1 className="text-2xl font-semibold leading-tight tracking-tight">Diárias</h1>
+        <div className="ride-date-context">
+          <div className="min-w-0 space-y-1">
+            <p className="text-sm font-medium text-muted-foreground">
+              {formatMonthLabel(referenceMonth)}
+            </p>
+            {validDate ? (
+              <time
+                dateTime={selectedDate}
+                className="block text-2xl font-semibold leading-8 tracking-tight tabular-nums"
+              >
+                {selectedDate === today ? "Hoje" : formatDateDisplay(selectedDate)}
+              </time>
+            ) : (
+              <p className="text-base font-medium">Selecione uma data</p>
+            )}
+            {validDate && selectedDate === today && (
+              <p className="text-sm text-muted-foreground">
+                {formatDateDisplay(selectedDate)}
+              </p>
+            )}
+          </div>
+          <div className="w-full max-w-[13rem] space-y-1">
+            <Label htmlFor="rideDate">Data</Label>
+            <Input
+              id="rideDate"
+              type="date"
+              max={today}
+              value={selectedDate}
+              aria-invalid={Boolean(dateError)}
+              aria-describedby={dateError ? "ride-error" : undefined}
+              onChange={(event) => setSelectedDate(event.target.value)}
+            />
+          </div>
+        </div>
+      </header>
 
       {(dateError || rideError) && (
-        <p role="alert" className="text-sm text-destructive">
+        <p id="ride-error" role="alert" className="ride-feedback ride-feedback--error">
           {dateError || rideError}
         </p>
       )}
 
       {loadingPassengers && (
-        <p className="text-sm opacity-70">Carregando passageiros...</p>
+        <p role="status" className="ride-feedback">
+          Carregando passageiros...
+        </p>
       )}
 
-      {!loadingPassengers && passengers?.length === 0 && (
-        <p className="text-sm opacity-70">
+      {passengersError && (
+        <p role="alert" className="ride-feedback ride-feedback--error">
+          Não foi possível carregar os passageiros. Tente novamente.
+        </p>
+      )}
+
+      {!loadingPassengers && !passengersError && passengers?.length === 0 && (
+        <p className="ride-feedback">
           Cadastre um passageiro antes de registrar diárias.
         </p>
       )}
 
       {ridesError && (
-        <p className="text-sm text-destructive">
+        <p role="alert" className="ride-feedback ride-feedback--error">
           Não foi possível carregar o histórico do mês.
         </p>
       )}
 
-      <div className="space-y-2">
-        {passengers?.map((passenger) => (
-          <PassengerRideButton
-            key={passenger.id}
-            passenger={passenger}
-            registered={ridesOnSelectedDate.has(passenger.id)}
-            registering={registeringId === passenger.id}
-            monthRides={ridesByPassenger.get(passenger.id) ?? []}
-            deletingId={deletingId}
-            onRegister={handleRegister}
-            onDeleteRide={handleDelete}
-          />
-        ))}
-      </div>
+      {Boolean(passengers?.length) && (
+        <section aria-labelledby="ride-passengers-heading" className="space-y-2">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h2 id="ride-passengers-heading" className="text-base font-semibold">
+              Passageiros
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Histórico de {formatMonthLabel(referenceMonth)}
+            </p>
+          </div>
+          <ul className="ride-list" aria-label="Passageiros e registros">
+            {passengers?.map((passenger) => (
+              <li key={passenger.id}>
+                <PassengerRideButton
+                  passenger={passenger}
+                  registered={ridesOnSelectedDate.has(passenger.id)}
+                  registering={registeringId === passenger.id}
+                  monthRides={ridesByPassenger.get(passenger.id) ?? []}
+                  deletingId={deletingId}
+                  onRegister={handleRegister}
+                  onDeleteRide={handleDelete}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
-      {loadingRides && <p className="text-sm opacity-70">Carregando...</p>}
+      {loadingRides && (
+        <p role="status" className="ride-feedback">
+          Carregando registros do mês...
+        </p>
+      )}
     </div>
   );
 }
