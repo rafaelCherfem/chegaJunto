@@ -2,6 +2,34 @@
 
 Controle de diárias de carona, sem caderno.
 
+## Preview local
+
+Com Node e as dependências instaladas (`npm ci`): abra o Docker Desktop e,
+na raiz deste worktree, execute:
+
+```sh
+npm run supabase:start
+npm run dev:local
+```
+
+Abra a URL local indicada pelo Vite (normalmente `http://127.0.0.1:5173`).
+Se o Supabase já está ativo, basta `npm run dev:local`. Ctrl+C encerra o
+preview; os serviços e dados Supabase continuam disponíveis.
+
+A CLI Supabase fixada no projeto fornece dinamicamente API_URL e ANON_KEY.
+O launcher aceita apenas localhost/127.0.0.1, recusa `supabase/.temp/project-ref`
+e passa somente as duas variáveis públicas ao Vite, sem gravar ou exibir chaves.
+Não use credenciais de produção. `.env.local` não é necessário e os arquivos
+`.env` são ignorados por este fluxo; a validação da aplicação permanece intacta.
+
+`supabase:start` inicia explicitamente os serviços locais e reutiliza os volumes
+existentes, sem reset. Em um ambiente ainda vazio, a CLI pode inicializar o banco
+com as migrations locais. Os dois worktrees usam o mesmo project_id `rideledger`
+e compartilham o ambiente Docker local. Para preview, não execute os comandos de
+reconstrução/reset descritos nas evidências históricas abaixo. `dev:local` apenas
+consulta o status e inicia o frontend; não inicia o banco, não modifica dados/Auth
+e nunca usa SERVICE_ROLE_KEY no frontend.
+
 ## Testes locais
 
 Node 24 foi utilizado nesta baseline. Instale as dependências com `npm ci`.

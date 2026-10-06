@@ -54,37 +54,44 @@ export function FlaggedRidesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-lg space-y-6 p-6 pb-24">
+    <div className="mx-auto max-w-lg space-y-5 p-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Sinalizadas</h1>
-        <p className="text-sm opacity-70">
+        <h1 className="page-heading">Sinalizadas</h1>
+        <p className="text-sm text-muted-foreground">
           Diárias que um passageiro marcou como cobradas errado.
         </p>
       </div>
 
-      {actionError && <p className="text-sm text-destructive">{actionError}</p>}
+      {actionError && (
+        <p role="alert" className="text-sm text-destructive">
+          {actionError}
+        </p>
+      )}
 
-      {isLoading && <p className="text-sm opacity-70">Carregando...</p>}
+      {isLoading && (
+        <p role="status" className="text-sm text-muted-foreground">
+          Carregando...
+        </p>
+      )}
 
       {isError && (
-        <p className="text-sm text-destructive">
+        <p role="alert" className="text-sm text-destructive">
           Não foi possível carregar as sinalizações.
         </p>
       )}
 
       {!isLoading && !isError && flags?.length === 0 && (
-        <p className="text-sm opacity-70">Nenhuma diária sinalizada.</p>
+        <p className="text-sm text-muted-foreground">Nenhuma diária sinalizada.</p>
       )}
 
       <div className="space-y-2">
         {flags?.map((flag) => (
           <div key={flag.flagId} className="surface p-4">
-            <p className="font-medium">
+            <p className="break-words font-semibold [overflow-wrap:anywhere]">
               {passengerNames[flag.passengerId] ?? "Passageiro"}
             </p>
-            <p className="text-sm opacity-70">
-              {formatDateDisplay(flag.rideDate)} ·{" "}
-              {formatCurrency(flag.rateCharged)}
+            <p className="text-sm text-muted-foreground">
+              {formatDateDisplay(flag.rideDate)} · {formatCurrency(flag.rateCharged)}
             </p>
 
             <div className="mt-3 flex flex-wrap gap-2">

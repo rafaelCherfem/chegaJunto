@@ -26,7 +26,7 @@
     --muted-foreground: 240 5% 72%;
 
     --border: 240 6% 23%;
-    --input: 240 5% 48%;
+    --input: 240 5% 44%;
     --ring: 270 65% 78%;
     --confirmation: 145 40% 70%;
     --confirmation-background: 145 16% 14%;
@@ -37,7 +37,7 @@
 
     --radius: 0.625rem;
     --page-gutter: 1rem;
-    --content-width: 66rem;
+    --content-width: 60rem;
   }
 
   * {
@@ -62,6 +62,164 @@
 }
 
 @layer components {
+  .rideledger-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625rem;
+    white-space: nowrap;
+  }
+  .rideledger-brand__mark {
+    width: 1.75rem;
+    height: 1.75rem;
+    flex-shrink: 0;
+    color: hsl(var(--identity));
+  }
+  .wordmark .rideledger-brand__name {
+    color: hsl(var(--foreground));
+  }
+  .wordmark .rideledger-brand__name > span {
+    color: hsl(var(--identity));
+  }
+  .app-shell,
+  .login-layout {
+    position: relative;
+    isolation: isolate;
+  }
+  .app-shell__header,
+  .app-shell__content,
+  .login-layout > header,
+  .login-form {
+    position: relative;
+    z-index: 1;
+  }
+  .route-decoration {
+    position: fixed;
+    inset: 0 0 calc(5rem + env(safe-area-inset-bottom, 0px));
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+    user-select: none;
+    --road-width: 24px;
+    --road-interior-width: 20.5px;
+    color: hsl(var(--identity));
+    /* Accent existente, mais saturado; a primeira declaração é o fallback. */
+    color: hsl(from hsl(var(--identity)) h calc(s + 20) calc(l - 10));
+    /* Reduz incursões no centro útil sem medir posições de texto. */
+    -webkit-mask-image: radial-gradient(
+      ellipse at center,
+      transparent 0% 35%,
+      rgb(0 0 0 / 0.12) 55%,
+      #000 88%
+    );
+    mask-image: radial-gradient(
+      ellipse at center,
+      transparent 0% 35%,
+      rgb(0 0 0 / 0.12) 55%,
+      #000 88%
+    );
+  }
+  .route-decoration svg {
+    position: absolute;
+    pointer-events: none;
+  }
+  .app-shell .route-decoration {
+    top: 4rem;
+  }
+  .route-decoration__band {
+    stroke-width: var(--road-width);
+  }
+  .route-decoration__interior {
+    stroke-width: var(--road-interior-width);
+  }
+  .route-decoration__body {
+    stroke: currentColor;
+    stroke-opacity: 0.05;
+  }
+  .route-decoration__edge {
+    stroke: currentColor;
+    stroke-opacity: 0.38;
+  }
+  .route-decoration__center {
+    stroke: currentColor;
+    stroke-opacity: 0.74;
+    stroke-width: 2.5px;
+    stroke-linecap: round;
+  }
+  .route-decoration__top {
+    width: 300px;
+    height: 244px;
+    top: -42px;
+    right: -155px;
+  }
+  .route-decoration__bottom {
+    display: none;
+  }
+  .context-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+    max-width: 30rem;
+    border-bottom: 1px solid hsl(var(--border));
+    padding-bottom: 1rem;
+  }
+  .context-summary > p {
+    flex-shrink: 0;
+  }
+  .context-summary--billing {
+    max-width: none;
+    justify-content: space-between;
+  }
+  .context-summary--billing > p {
+    flex: 1 1 14rem;
+    min-width: 0;
+  }
+  .daily-progress {
+    height: 3px;
+    width: 6rem;
+    border-radius: 2px;
+    overflow: hidden;
+    background: hsl(var(--muted));
+  }
+  .daily-progress > span {
+    display: block;
+    height: 100%;
+    background: hsl(var(--confirmation));
+  }
+  @media (min-width: 375px) {
+    .route-decoration__top {
+      width: 330px;
+      height: 268px;
+      right: -165px;
+    }
+  }
+  @media (min-width: 1024px) {
+    .route-decoration {
+      --road-width: 42px;
+      --road-interior-width: 38.5px;
+    }
+    .app-shell .route-decoration {
+      left: 13rem;
+      top: 0;
+      bottom: 0;
+    }
+    .route-decoration__top {
+      width: 620px;
+      height: 504px;
+      top: -130px;
+      right: -160px;
+    }
+    .route-decoration__bottom {
+      display: block;
+      width: 560px;
+      height: 455px;
+      bottom: -160px;
+      left: -130px;
+    }
+    .login-layout .route-decoration {
+      bottom: 0;
+    }
+  }
   .surface {
     @apply rounded-lg bg-card text-card-foreground;
   }
@@ -97,7 +255,8 @@
 
   /* Compatibilidade das páginas antigas: a reserva da navegação é do shell. */
   .app-shell__content > :first-child {
-    max-width: 100%;
+    width: 100%;
+    max-width: var(--page-width, 48rem);
     padding-inline: var(--page-gutter);
     padding-bottom: 1.5rem;
   }
@@ -114,7 +273,7 @@
   }
 
   .app-shell__nav-link {
-    @apply relative flex min-h-16 min-w-0 flex-col items-center justify-center gap-1 px-1 py-2 text-center text-xs font-medium text-muted-foreground transition-colors;
+    @apply relative flex min-h-16 min-w-0 flex-col items-center justify-center gap-1 py-2 text-center text-xs font-medium text-muted-foreground transition-colors;
   }
 
   .app-shell__nav-link[aria-current="page"] {
@@ -132,9 +291,77 @@
   }
 
   .app-shell__nav-label {
-    overflow-wrap: anywhere;
-    hyphens: auto;
+    white-space: nowrap;
+    word-break: normal;
+    hyphens: none;
     line-height: 1.25;
+  }
+
+  .page--passengers {
+    --page-width: 52rem;
+  }
+  .page--rides {
+    --page-width: 46rem;
+  }
+  .page--charges {
+    --page-width: 58rem;
+  }
+  .page--compensations {
+    --page-width: 42rem;
+  }
+
+  .page-heading {
+    @apply text-2xl font-semibold leading-tight tracking-tight;
+  }
+  .passenger-row {
+    @apply flex flex-wrap items-center justify-between gap-x-4 gap-y-2;
+  }
+  .passenger-actions {
+    @apply flex flex-wrap items-center gap-1.5;
+  }
+  .passenger-actions > button {
+    @apply shrink-0 text-[hsl(var(--text-subtle))] hover:text-foreground;
+  }
+  .passenger-actions svg {
+    stroke-width: 1.75;
+  }
+  .passenger-actions > button:last-child {
+    @apply hover:text-destructive;
+  }
+  .form-panel {
+    @apply w-full max-w-xl space-y-4 rounded-lg bg-card p-4 sm:p-5;
+  }
+  .form-panel .field-row {
+    @apply grid grid-cols-1 gap-4 sm:grid-cols-2;
+  }
+  .form-select {
+    @apply flex min-h-12 min-w-0 w-full rounded-lg border border-input bg-[hsl(var(--form-background))] px-3 py-2 text-base text-[hsl(var(--form-foreground))] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:bg-muted disabled:text-muted-foreground aria-[invalid=true]:border-destructive aria-[invalid=true]:focus-visible:ring-destructive;
+  }
+  .month-controls {
+    @apply grid w-full max-w-md grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 border-b border-border pb-3;
+  }
+  .financial-list {
+    @apply grid grid-cols-1 gap-3 xl:grid-cols-2;
+  }
+  .charge-status {
+    @apply inline-flex min-h-6 items-center gap-1 rounded px-2 py-1 text-xs font-semibold leading-none;
+  }
+  .charge-status--paid {
+    background: hsl(var(--confirmation-background));
+    color: hsl(var(--confirmation));
+  }
+  .charge-status--pending {
+    background: hsl(var(--attention) / 0.1);
+    color: hsl(var(--attention));
+  }
+  .charge-status--neutral {
+    @apply bg-muted text-muted-foreground;
+  }
+  .charge-actions {
+    @apply mt-4 flex flex-wrap gap-2 border-t border-border/60 pt-3;
+  }
+  .charge-actions > button {
+    @apply w-full max-w-full justify-start whitespace-normal text-left sm:w-auto;
   }
 
   .ride-list {
@@ -146,12 +373,30 @@
   }
 
   .ride-date-context {
-    @apply flex flex-wrap items-end justify-between gap-5 pb-6;
+    @apply grid grid-cols-1 items-end gap-3 pb-4;
     border-bottom: 1px solid hsl(var(--border));
   }
 
+  .ride-passengers {
+    width: 100%;
+    max-width: 30rem;
+  }
+
+  @media (min-width: 375px) {
+    .ride-date-context {
+      grid-template-columns: minmax(0, 1fr) 12rem;
+    }
+  }
+
+  @media (min-width: 640px) {
+    .ride-date-context {
+      grid-template-columns: minmax(10rem, auto) 12rem;
+      justify-content: start;
+      column-gap: 2rem;
+    }
+  }
   .ride-register-row {
-    @apply grid min-h-16 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 rounded-lg py-1 text-left;
+    @apply grid min-h-16 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 rounded-lg py-1 text-left enabled:hover:bg-muted/50 enabled:active:bg-muted;
   }
 
   .ride-register-action {
@@ -165,7 +410,7 @@
   }
 
   .ride-history-row {
-    @apply grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 py-2 text-sm;
+    @apply flex flex-wrap items-center justify-between gap-2 py-1 text-sm;
   }
 
   .ride-feedback {
@@ -191,17 +436,17 @@
 
   @media (min-width: 1024px) {
     .app-shell {
-      padding-left: 14rem;
+      padding-left: 13rem;
     }
     .app-shell__content {
       padding-bottom: 2rem;
     }
     .app-shell__header {
-      padding-block: 1.25rem;
+      padding-block: 0.75rem;
     }
     .app-shell__nav {
       inset: 0 auto 0 0;
-      width: 14rem;
+      width: 13rem;
       padding: 2rem 1rem;
       border-top: 0;
       border-right: 1px solid hsl(var(--border));

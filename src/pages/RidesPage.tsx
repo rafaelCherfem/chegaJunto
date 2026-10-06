@@ -1,3 +1,4 @@
+import { DailySummary } from "@/components/rides/DailySummary";
 import { useMemo, useState } from "react";
 import { PassengerRideButton } from "@/components/rides/PassengerRideButton";
 import { Input } from "@/components/ui/input";
@@ -102,9 +103,9 @@ export function RidesPage() {
   }
 
   return (
-    <div className="mx-auto space-y-6 p-6">
-      <header className="space-y-5">
-        <h1 className="text-2xl font-semibold leading-tight tracking-tight">Diárias</h1>
+    <div className="page--rides mx-auto space-y-5 p-6">
+      <header className="space-y-4">
+        <h1 className="page-heading">Diárias</h1>
         <div className="ride-date-context">
           <div className="min-w-0 space-y-1">
             <p className="text-sm font-medium text-muted-foreground">
@@ -113,7 +114,7 @@ export function RidesPage() {
             {validDate ? (
               <time
                 dateTime={selectedDate}
-                className="block text-2xl font-semibold leading-8 tracking-tight tabular-nums"
+                className="block text-xl font-semibold leading-7 tracking-tight tabular-nums sm:text-2xl sm:leading-8"
               >
                 {selectedDate === today ? "Hoje" : formatDateDisplay(selectedDate)}
               </time>
@@ -126,7 +127,7 @@ export function RidesPage() {
               </p>
             )}
           </div>
-          <div className="w-full max-w-[13rem] space-y-1">
+          <div className="min-w-0 space-y-1">
             <Label htmlFor="rideDate">Data</Label>
             <Input
               id="rideDate"
@@ -140,6 +141,20 @@ export function RidesPage() {
           </div>
         </div>
       </header>
+
+      {!dateError &&
+        !loadingPassengers &&
+        !loadingRides &&
+        !passengersError &&
+        !ridesError &&
+        passengers &&
+        rides && (
+          <DailySummary
+            passengers={passengers}
+            registeredIds={ridesOnSelectedDate}
+            isToday={selectedDate === today}
+          />
+        )}
 
       {(dateError || rideError) && (
         <p id="ride-error" role="alert" className="ride-feedback ride-feedback--error">
@@ -172,7 +187,10 @@ export function RidesPage() {
       )}
 
       {Boolean(passengers?.length) && (
-        <section aria-labelledby="ride-passengers-heading" className="space-y-2">
+        <section
+          aria-labelledby="ride-passengers-heading"
+          className="ride-passengers space-y-2"
+        >
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <h2 id="ride-passengers-heading" className="text-base font-semibold">
               Passageiros

@@ -53,7 +53,7 @@ export function PassengerInvitePanel({ passengerId }: { passengerId: string }) {
   return (
     <div className="mt-3 border-t border-black/10 pt-3">
       <p className="mb-2 text-xs font-medium opacity-70">Acesso do passageiro</p>
-      {isLoading && <p>Carregando...</p>}
+      {isLoading && <p role="status">Carregando...</p>}
       {isError && <p role="alert">Não foi possível carregar os convites.</p>}
       <p className="text-xs">
         O novo convite substitui o anterior. Copie o link agora; ele não será recuperável
@@ -67,7 +67,7 @@ export function PassengerInvitePanel({ passengerId }: { passengerId: string }) {
       {invites?.map((invite) => (
         <div
           key={invite.id}
-          className="mt-2 flex items-center justify-between gap-2 text-xs"
+          className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs"
         >
           <span>
             {inviteStatus(invite, now)} · expira{" "}

@@ -1,3 +1,5 @@
+import { BillingSummary } from "@/components/charges/BillingSummary";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useMemo, useState } from "react";
 import { addCents, toCents } from "@/utils/money";
 import { MonthlyChargeCard } from "@/components/charges/MonthlyChargeCard";
@@ -28,9 +30,16 @@ export function MonthlyClosingPage() {
   const [referenceMonth, setReferenceMonth] = useState(currentMonthStart());
 
   const { data: passengers } = usePassengers(true);
-  const { data: rides, isLoading: loadingRides } = useRidesByMonth(referenceMonth);
-  const { data: receivedRides, isLoading: loadingReceived } =
-    useReceivedRidesByMonth(referenceMonth);
+  const {
+    data: rides,
+    isLoading: loadingRides,
+    isError: ridesError,
+  } = useRidesByMonth(referenceMonth);
+  const {
+    data: receivedRides,
+    isLoading: loadingReceived,
+    isError: receivedError,
+  } = useReceivedRidesByMonth(referenceMonth);
   const {
     data: charges,
     isLoading: loadingCharges,
@@ -148,9 +157,7 @@ export function MonthlyClosingPage() {
       await generateReceipt.mutateAsync({ passenger, charge, referenceMonth });
     } catch (error) {
       setActionError(
-        error instanceof Error
-          ? error.message
-          : "Não foi possível gerar o comprovante.",
+        error instanceof Error ? error.message : "Não foi possível gerar o comprovante.",
       );
     } finally {
       setGeneratingId(null);
@@ -158,45 +165,61 @@ export function MonthlyClosingPage() {
   }
 
   return (
-    <div className="mx-auto max-w-lg space-y-6 p-6 pb-24">
-      <h1 className="text-2xl font-semibold tracking-tight">Cobranças</h1>
+    <div className="page--charges mx-auto space-y-5 p-6">
+      <h1 className="page-heading">Cobranças</h1>
 
-      <div className="surface flex items-center justify-between p-3">
+      <div className="month-controls">
         <Button
           variant="ghost"
-          size="sm"
+          size="icon"
+          aria-label="Mês anterior"
+          title="Mês anterior"
           onClick={() => setReferenceMonth(previousMonth(referenceMonth))}
         >
-          ← Anterior
+          <ChevronLeft className="h-5 w-5" aria-hidden="true" />
         </Button>
-        <span className="text-sm font-medium capitalize">
+        <span className="min-w-0 text-center text-sm font-semibold capitalize tabular-nums">
           {formatMonthLabel(referenceMonth)}
         </span>
         <Button
           variant="ghost"
-          size="sm"
+          size="icon"
+          aria-label="Próximo mês"
+          title="Próximo mês"
           onClick={() => setReferenceMonth(nextMonth(referenceMonth))}
         >
-          Próximo →
+          <ChevronRight className="h-5 w-5" aria-hidden="true" />
         </Button>
       </div>
 
-      <Button onClick={handleCalculate} disabled={calculate.isPending}>
+      <Button
+        onClick={handleCalculate}
+        disabled={calculate.isPending}
+        aria-busy={calculate.isPending}
+      >
         {calculate.isPending ? "Calculando..." : "Calcular fechamento"}
       </Button>
 
       {calculateError && (
-        <p className="text-sm text-destructive">{calculateError}</p>
+        <p role="alert" className="text-sm text-destructive">
+          {calculateError}
+        </p>
       )}
 
-      {actionError && <p className="text-sm text-destructive">{actionError}</p>}
+      {actionError && (
+        <p role="alert" className="text-sm text-destructive">
+          {actionError}
+        </p>
+      )}
 
       {(loadingRides || loadingCharges || loadingReceived) && (
-        <p className="text-sm opacity-70">Carregando...</p>
+        <p role="status" className="text-sm text-muted-foreground">
+          Carregando...
+        </p>
       )}
 
       {chargesError && (
-        <p className="text-sm text-destructive">
+        <p role="alert" className="text-sm text-destructive">
           Não foi possível carregar o fechamento deste mês.
         </p>
       )}
@@ -207,11 +230,44 @@ export function MonthlyClosingPage() {
         </p>
       )}
 
-      <div className="space-y-2">
+      {!loadingRides &&
+        !loadingCharges &&
+        !loadingReceived &&
+        !chargesError &&
+        !ridesError &&
+        !receivedError &&
+        rides &&
+        receivedRides &&
+        charges && (
+          <BillingSummary
+            rows={passengerIds.map((passengerId) => {
+              const computed =
+                addCents(
+                  rideTotals.get(passengerId) ?? 0,
+                  -(compensationTotals.get(passengerId) ?? 0),
+                ) / 100;
+              const stored = chargesByPassenger.get(passengerId);
+              return {
+                amount: stored?.totalAmount ?? computed,
+                paid: stored?.paid ?? false,
+                status: !stored
+                  ? "preview"
+                  : amountsMatch(stored.totalAmount, computed)
+                    ? "closed"
+                    : "outdated",
+              };
+            })}
+          />
+        )}
+      <div className="financial-list">
         {passengerIds.map((passengerId) => {
           const rideAmount = (rideTotals.get(passengerId) ?? 0) / 100;
           const compensationAmount = (compensationTotals.get(passengerId) ?? 0) / 100;
-          const computed = addCents(rideTotals.get(passengerId) ?? 0, -(compensationTotals.get(passengerId) ?? 0)) / 100;
+          const computed =
+            addCents(
+              rideTotals.get(passengerId) ?? 0,
+              -(compensationTotals.get(passengerId) ?? 0),
+            ) / 100;
           const stored = chargesByPassenger.get(passengerId);
           const passenger = passengersById.get(passengerId);
           const passengerName = passenger?.name ?? "Passageiro";
@@ -250,7 +306,10 @@ export function MonthlyClosingPage() {
               toggling={togglingId === stored.id}
               generatingReceipt={generatingId === stored.id}
               onMarkPaid={() => handleMarkPaid(stored.id, stored.revision)}
-              onUnmarkPaid={() => stored.activePaymentId && handleUnmarkPaid(stored.id, stored.activePaymentId)}
+              onUnmarkPaid={() =>
+                stored.activePaymentId &&
+                handleUnmarkPaid(stored.id, stored.activePaymentId)
+              }
               onGenerateReceipt={() =>
                 passenger && handleGenerateReceipt(passenger, stored)
               }

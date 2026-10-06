@@ -101,21 +101,25 @@ export function CompensationsPage() {
   );
 
   return (
-    <div className="mx-auto max-w-lg space-y-6 p-6 pb-24">
+    <div className="page--compensations mx-auto space-y-5 p-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Compensações</h1>
-        <p className="text-sm opacity-70">
+        <h1 className="page-heading">Compensações</h1>
+        <p className="mt-1 max-w-lg text-sm leading-6 text-muted-foreground">
           Registre quando um passageiro te deu uma carona — o valor é abatido do que ele
           deve no mês.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="surface space-y-4 p-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="form-panel">
         <div className="space-y-1">
           <Label htmlFor="passengerId">Passageiro</Label>
           <select
             id="passengerId"
-            className="flex h-12 w-full rounded-[0.5rem] border border-input bg-[hsl(var(--form-background))] px-3 py-2 text-base text-[hsl(var(--form-foreground))] outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-invalid={Boolean(errors.passengerId)}
+            aria-describedby={
+              errors.passengerId ? "compensation-passenger-error" : undefined
+            }
+            className="form-select"
             {...register("passengerId")}
           >
             <option value="">Selecione...</option>
@@ -126,40 +130,74 @@ export function CompensationsPage() {
             ))}
           </select>
           {errors.passengerId && (
-            <p className="text-xs text-destructive">{errors.passengerId.message}</p>
+            <p
+              id="compensation-passenger-error"
+              role="alert"
+              className="text-sm text-destructive"
+            >
+              {errors.passengerId.message}
+            </p>
           )}
         </div>
 
-        <div className="space-y-1">
-          <Label htmlFor="receivedDate">Data</Label>
-          <Input
-            id="receivedDate"
-            type="date"
-            max={todayISODate()}
-            {...register("receivedDate")}
-          />
-          {errors.receivedDate && (
-            <p className="text-xs text-destructive">{errors.receivedDate.message}</p>
-          )}
+        <div className="field-row">
+          <div className="min-w-0 space-y-1">
+            <Label htmlFor="receivedDate">Data</Label>
+            <Input
+              id="receivedDate"
+              aria-invalid={Boolean(errors.receivedDate)}
+              aria-describedby={
+                errors.receivedDate ? "compensation-date-error" : undefined
+              }
+              type="date"
+              max={todayISODate()}
+              {...register("receivedDate")}
+            />
+            {errors.receivedDate && (
+              <p
+                id="compensation-date-error"
+                role="alert"
+                className="text-sm text-destructive"
+              >
+                {errors.receivedDate.message}
+              </p>
+            )}
+          </div>
+
+          <div className="min-w-0 space-y-1">
+            <Label htmlFor="amount">Valor a abater</Label>
+            <Input
+              id="amount"
+              aria-invalid={Boolean(errors.amount)}
+              aria-describedby={errors.amount ? "compensation-amount-error" : undefined}
+              type="number"
+              step="0.01"
+              inputMode="decimal"
+              {...register("amount")}
+            />
+            {errors.amount && (
+              <p
+                id="compensation-amount-error"
+                role="alert"
+                className="text-sm text-destructive"
+              >
+                {errors.amount.message}
+              </p>
+            )}
+          </div>
         </div>
+        {submitError && (
+          <p role="alert" className="text-sm text-destructive">
+            {submitError}
+          </p>
+        )}
 
-        <div className="space-y-1">
-          <Label htmlFor="amount">Valor a abater</Label>
-          <Input
-            id="amount"
-            type="number"
-            step="0.01"
-            inputMode="decimal"
-            {...register("amount")}
-          />
-          {errors.amount && (
-            <p className="text-xs text-destructive">{errors.amount.message}</p>
-          )}
-        </div>
-
-        {submitError && <p className="text-xs text-destructive">{submitError}</p>}
-
-        <Button type="submit" disabled={isSubmitting}>
+        <Button
+          type="submit"
+          disabled={isSubmitting}
+          aria-busy={isSubmitting}
+          className="w-full whitespace-normal sm:w-auto"
+        >
           {isSubmitting ? "Registrando..." : "Registrar carona recebida"}
         </Button>
       </form>
@@ -169,16 +207,20 @@ export function CompensationsPage() {
           Registradas em {formatMonthLabel(referenceMonth)}
         </h2>
 
-        {isLoading && <p className="text-sm opacity-70">Carregando...</p>}
+        {isLoading && (
+          <p className="mt-1 max-w-lg text-sm leading-6 text-muted-foreground">
+            Carregando...
+          </p>
+        )}
 
         {isError && (
-          <p className="text-sm text-destructive">
+          <p role="alert" className="text-sm text-destructive">
             Não foi possível carregar as compensações do mês.
           </p>
         )}
 
         {!isLoading && !isError && sortedReceivedRides.length === 0 && (
-          <p className="text-sm opacity-70">
+          <p className="mt-1 max-w-lg text-sm leading-6 text-muted-foreground">
             Nenhuma compensação registrada neste mês ainda.
           </p>
         )}
@@ -186,13 +228,13 @@ export function CompensationsPage() {
         {sortedReceivedRides.map((receivedRide) => (
           <div
             key={receivedRide.id}
-            className="surface flex items-center justify-between p-3"
+            className="flex min-w-0 items-center justify-between gap-3 border-b border-border/60 py-3"
           >
-            <div>
-              <p className="text-sm font-medium">
+            <div className="min-w-0">
+              <p className="break-words [overflow-wrap:anywhere] text-sm font-semibold">
                 {passengerNames[receivedRide.passengerId] ?? "Passageiro"}
               </p>
-              <p className="text-xs opacity-70">
+              <p className="text-sm tabular-nums text-muted-foreground">
                 {formatDateDisplay(receivedRide.receivedDate)} ·{" "}
                 {formatCurrency(receivedRide.amount)}
               </p>
@@ -203,8 +245,10 @@ export function CompensationsPage() {
               disabled={deletingId === receivedRide.id}
               onClick={() => handleDelete(receivedRide)}
               aria-label="Remover compensação"
+              title="Remover compensação"
+              className="text-muted-foreground hover:text-destructive"
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
             </Button>
           </div>
         ))}

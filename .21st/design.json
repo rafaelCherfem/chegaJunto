@@ -5,7 +5,7 @@
     "identity": "Grafite estrutural, roxo contido, verde para registro e confirmação",
     "typography": "Inter; valores alinhados com tabular-nums",
     "composition": "Navegação inferior estrutural no mobile, lateral no desktop; listas contínuas",
-    "brand": "Wordmark tipográfico temporário; assets antigos preservados para decisão separada",
+    "brand": "Percurso vetorial com ponto de destino ao lado do wordmark; pista estática assimétrica; PNGs PWA aguardam pipeline próprio",
     "constraints": "Somente apresentação e acessibilidade; preservar contratos, auth, datas e financeiro"
   }
 }

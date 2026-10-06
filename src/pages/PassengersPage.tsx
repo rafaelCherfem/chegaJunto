@@ -21,9 +21,7 @@ export function PassengersPage() {
   const deletePassenger = useDeletePassenger();
 
   const [creating, setCreating] = useState(false);
-  const [editingPassenger, setEditingPassenger] = useState<Passenger | null>(
-    null,
-  );
+  const [editingPassenger, setEditingPassenger] = useState<Passenger | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<{
@@ -49,9 +47,7 @@ export function PassengersPage() {
       setCreating(false);
       setEditingPassenger(null);
     } catch (error) {
-      setFormError(
-        error instanceof Error ? error.message : "Não foi possível salvar.",
-      );
+      setFormError(error instanceof Error ? error.message : "Não foi possível salvar.");
     }
   }
 
@@ -74,8 +70,7 @@ export function PassengersPage() {
     } catch (error) {
       setDeleteError({
         id: passenger.id,
-        message:
-          error instanceof Error ? error.message : "Não foi possível excluir.",
+        message: error instanceof Error ? error.message : "Não foi possível excluir.",
       });
     } finally {
       setDeletingId(null);
@@ -83,12 +78,12 @@ export function PassengersPage() {
   }
 
   return (
-    <div className="mx-auto max-w-lg space-y-4 p-6 pb-24">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">Passageiros</h1>
+    <div className="page--passengers mx-auto space-y-5 p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="page-heading">Passageiros</h1>
         {!formOpen && (
           <Button size="sm" onClick={() => setCreating(true)}>
-            <UserPlus className="mr-2 h-4 w-4" />
+            <UserPlus className="h-4 w-4" aria-hidden="true" />
             Novo
           </Button>
         )}
@@ -104,10 +99,14 @@ export function PassengersPage() {
         />
       )}
 
-      {isLoading && <p className="text-sm opacity-70">Carregando...</p>}
+      {isLoading && (
+        <p role="status" className="text-sm text-muted-foreground">
+          Carregando...
+        </p>
+      )}
 
       {isError && (
-        <p className="text-sm text-destructive">
+        <p role="alert" className="text-sm text-destructive">
           Não foi possível carregar os passageiros. Tente novamente.
         </p>
       )}
@@ -124,9 +123,7 @@ export function PassengersPage() {
             key={passenger.id}
             passenger={passenger}
             deleting={deletingId === passenger.id}
-            deleteError={
-              deleteError?.id === passenger.id ? deleteError.message : null
-            }
+            deleteError={deleteError?.id === passenger.id ? deleteError.message : null}
             onEdit={setEditingPassenger}
             onToggleActive={handleToggleActive}
             onDelete={handleDelete}

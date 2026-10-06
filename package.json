@@ -6,6 +6,8 @@
   "description": "Controle de diárias de carona, sem caderno.",
   "scripts": {
     "dev": "vite",
+    "dev:local": "node scripts/dev-local.mjs",
+    "supabase:start": "node scripts/supabase-start-local.mjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "lint": "eslint .",

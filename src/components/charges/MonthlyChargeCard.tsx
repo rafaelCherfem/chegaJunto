@@ -1,6 +1,5 @@
-import { Check } from "lucide-react";
+import { Check, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/utils/currency";
 import { debtLabel, toCents } from "@/utils/money";
 interface MonthlyChargeCardProps {
@@ -20,24 +19,82 @@ interface MonthlyChargeCardProps {
 export function MonthlyChargeCard(props: MonthlyChargeCardProps) {
   const cents = toCents(props.amount);
   const settled = props.status === "closed" && props.paid;
-  return <div className={cn("surface p-4", settled && cents !== 0 && "ring-2 ring-primary/50")}>
-    <div className="flex items-center justify-between gap-2">
-      <p className="font-medium">{props.passengerName}</p>
-      <div className="flex items-center gap-1.5">
-        {props.status !== "closed" && <span className="rounded-full bg-black/10 px-2 py-0.5 text-xs">{props.status === "preview" ? "Prévia" : "Desatualizado"}</span>}
-        {settled && cents !== 0 && <span className="flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground"><Check className="h-3 w-3" />Pago</span>}
-        {props.status === "closed" && !props.paid && cents !== 0 && <span className="text-xs">Pendente</span>}
+  return (
+    <div className="surface min-w-0 p-4 sm:p-5">
+      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+        <p className="min-w-0 flex-1 basis-32 break-words [overflow-wrap:anywhere] text-base font-semibold leading-6">
+          {props.passengerName}
+        </p>
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+          {props.status !== "closed" && (
+            <span className="charge-status charge-status--neutral">
+              {props.status === "preview" ? "Prévia" : "Desatualizado"}
+            </span>
+          )}
+          {settled && cents !== 0 && (
+            <span className="charge-status charge-status--paid">
+              <Check className="h-3.5 w-3.5" aria-hidden="true" />
+              Pago
+            </span>
+          )}
+          {props.status === "closed" && !props.paid && cents !== 0 && (
+            <span className="charge-status charge-status--pending">Pendente</span>
+          )}
+        </div>
       </div>
+      <p className="mt-3 break-words [overflow-wrap:anywhere] text-2xl font-semibold leading-8 tracking-tight tabular-nums">
+        {formatCurrency(props.amount)}
+      </p>
+      <p className="mt-1 text-sm text-muted-foreground">{debtLabel(cents)}</p>
+      {props.compensationAmount > 0 && (
+        <p className="mt-2 text-sm tabular-nums text-muted-foreground">
+          Diárias: {formatCurrency(props.rideAmount)} · Compensação: −
+          {formatCurrency(props.compensationAmount)}
+        </p>
+      )}
+      {props.status === "outdated" && props.computedAmount !== undefined && (
+        <p className="mt-2 text-sm tabular-nums text-muted-foreground">
+          Total atualizado seria {formatCurrency(props.computedAmount)} — recalcule para
+          atualizar.
+        </p>
+      )}
+      {props.status !== "preview" && (
+        <div className="charge-actions">
+          {props.status === "closed" &&
+            cents !== 0 &&
+            (settled ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={props.toggling}
+                aria-busy={props.toggling}
+                onClick={props.onUnmarkPaid}
+              >
+                Desmarcar pagamento
+              </Button>
+            ) : (
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={props.toggling}
+                aria-busy={props.toggling}
+                onClick={props.onMarkPaid}
+              >
+                Marcar como pago
+              </Button>
+            ))}
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={props.generatingReceipt || props.status === "outdated"}
+            aria-busy={props.generatingReceipt}
+            onClick={props.onGenerateReceipt}
+          >
+            <FileText className="h-4 w-4 shrink-0" aria-hidden="true" />
+            Gerar comprovante
+          </Button>
+        </div>
+      )}
     </div>
-    <p className="mt-1 text-2xl font-semibold tracking-tight">{formatCurrency(props.amount)}</p>
-    <p className="mt-1 text-xs opacity-70">{debtLabel(cents)}</p>
-    {props.compensationAmount > 0 && <p className="mt-1 text-xs opacity-70">Diárias: {formatCurrency(props.rideAmount)} · Compensação: −{formatCurrency(props.compensationAmount)}</p>}
-    {props.status === "outdated" && props.computedAmount !== undefined && <p className="mt-1 text-xs opacity-70">Total atualizado seria {formatCurrency(props.computedAmount)} — recalcule para atualizar.</p>}
-    {props.status !== "preview" && <div className="mt-3 flex flex-wrap gap-2">
-      {props.status === "closed" && cents !== 0 && (settled ?
-        <Button variant="outline" size="sm" disabled={props.toggling} onClick={props.onUnmarkPaid}>Desmarcar pagamento</Button> :
-        <Button size="sm" disabled={props.toggling} onClick={props.onMarkPaid}>Marcar como pago</Button>)}
-      <Button variant="outline" size="sm" disabled={props.generatingReceipt || props.status === "outdated"} onClick={props.onGenerateReceipt}>Gerar comprovante</Button>
-    </div>}
-  </div>;
+  );
 }

@@ -30,7 +30,7 @@ export function PassengerRideButton({
   const sortedRides = [...monthRides].sort((a, b) => (a.rideDate < b.rideDate ? 1 : -1));
 
   return (
-    <div className="py-4">
+    <div className="py-3">
       <div className="space-y-1">
         <button
           type="button"
@@ -104,7 +104,7 @@ export function PassengerRideButton({
                 <time dateTime={ride.rideDate} className="tabular-nums">
                   {formatDateDisplay(ride.rideDate)}
                 </time>
-                <div className="ml-auto flex min-w-0 max-w-full items-center gap-3">
+                <div className="ml-auto flex min-w-0 max-w-full items-center gap-2">
                   <span className="min-w-0 text-right font-medium tabular-nums [overflow-wrap:anywhere]">
                     {formatCurrency(ride.rateCharged)}
                   </span>
@@ -114,10 +114,11 @@ export function PassengerRideButton({
                     disabled={deletingId === ride.id}
                     onClick={() => onDeleteRide(ride)}
                     aria-label="Remover diária"
+                    title="Remover diária"
                     aria-busy={deletingId === ride.id}
                     className="h-11 w-11 text-muted-foreground hover:text-destructive"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
                   </Button>
                 </div>
               </li>
