@@ -22,11 +22,18 @@ insert into public.rides(id,user_id,passenger_id,ride_date,rate_charged) values
 ('30000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','2025-01-01',10),
 ('30000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000002','2025-01-01',10);
 insert into public.received_rides(user_id,passenger_id,received_date,amount)
-select user_id,id,'2025-01-01',2 from public.passengers;
+values
+('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','2025-01-01',2),
+('10000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000002','2025-01-01',2);
 insert into public.monthly_charges(user_id,passenger_id,reference_month,total_amount)
-select user_id,id,'2025-01-01',8 from public.passengers;
+values
+('10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','2025-01-01',8),
+('10000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000002','2025-01-01',8);
 insert into public.passenger_invites(passenger_id,owner_user_id,token_hash)
-select id,user_id,encode(extensions.digest(repeat(right(id::text,1),64),'sha256'),'hex') from public.passengers;
+-- Reserved fixture tokens match the redemption assertions below; unrelated rows are never selected.
+values
+('20000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001',encode(extensions.digest(repeat('1',64),'sha256'),'hex')),
+('20000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000002',encode(extensions.digest(repeat('2',64),'sha256'),'hex'));
 
 select ok(not has_table_privilege('authenticated','public.responsible_accounts','INSERT'), 'responsibility cannot be self assigned');
 select ok(not has_table_privilege('authenticated','public.passenger_accounts','INSERT'), 'links can only be inserted through controlled operations');
