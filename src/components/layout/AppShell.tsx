@@ -45,7 +45,7 @@ export function AppShell() {
 
       <nav
         aria-label="Navegação principal"
-        className="app-shell__nav fixed inset-x-0 bottom-0 z-10 border-t border-border bg-card"
+        className="app-shell__nav fixed inset-x-0 bottom-0 z-10 border-t border-border bg-card/85 backdrop-blur-md"
       >
         <RideLedgerBrand className="mb-8 hidden px-3 lg:inline-flex" />
         <div className="app-shell__nav-list">
