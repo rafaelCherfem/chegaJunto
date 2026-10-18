@@ -15,6 +15,10 @@ dev-dist
 !.vscode/extensions.json
 .idea
 
+# claude local
+.claude/settings.local.json
+CLAUDE.local.md
+
 # os
 .DS_Store
 
@@ -25,3 +29,6 @@ npm-debug.log*
 # pwa
 **/public/sw.js
 **/public/workbox-*.js
+
+# supabase studio scratch queries
+supabase/snippets/
