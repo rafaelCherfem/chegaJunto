@@ -2,6 +2,7 @@ import { Check, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/utils/currency";
 import { debtLabel, toCents } from "@/utils/money";
+import { initials } from "@/utils/initials";
 interface MonthlyChargeCardProps {
   passengerName: string;
   amount: number;
@@ -21,11 +22,17 @@ export function MonthlyChargeCard(props: MonthlyChargeCardProps) {
   const settled = props.status === "closed" && props.paid;
   return (
     <div className="surface min-w-0 p-4 sm:p-5">
-      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
-        <p className="min-w-0 flex-1 basis-32 break-words [overflow-wrap:anywhere] text-base font-semibold leading-6">
+      <div className="flex items-start gap-3">
+        <span
+          aria-hidden="true"
+          className={settled ? "avatar avatar--done" : "avatar avatar--due"}
+        >
+          {initials(props.passengerName)}
+        </span>
+        <p className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] text-base font-semibold leading-10">
           {props.passengerName}
         </p>
-        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5 py-2.5">
           {props.status !== "closed" && (
             <span className="charge-status charge-status--neutral">
               {props.status === "preview" ? "Prévia" : "Desatualizado"}
@@ -42,7 +49,7 @@ export function MonthlyChargeCard(props: MonthlyChargeCardProps) {
           )}
         </div>
       </div>
-      <p className="mt-3 break-words [overflow-wrap:anywhere] text-2xl font-semibold leading-8 tracking-tight tabular-nums">
+      <p className="stat-value mt-3 break-words text-[2rem] leading-9 [overflow-wrap:anywhere]">
         {formatCurrency(props.amount)}
       </p>
       <p className="mt-1 text-sm text-muted-foreground">{debtLabel(cents)}</p>

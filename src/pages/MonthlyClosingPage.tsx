@@ -1,4 +1,4 @@
-import { BillingSummary } from "@/components/charges/BillingSummary";
+import { MonthHero } from "@/components/charges/MonthHero";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useMemo, useState } from "react";
 import { addCents, toCents } from "@/utils/money";
@@ -178,7 +178,7 @@ export function MonthlyClosingPage() {
         >
           <ChevronLeft className="h-5 w-5" aria-hidden="true" />
         </Button>
-        <span className="min-w-0 text-center text-sm font-semibold capitalize tabular-nums">
+        <span className="min-w-0 text-center text-sm font-semibold first-letter:uppercase tabular-nums">
           {formatMonthLabel(referenceMonth)}
         </span>
         <Button
@@ -239,7 +239,8 @@ export function MonthlyClosingPage() {
         rides &&
         receivedRides &&
         charges && (
-          <BillingSummary
+          <MonthHero
+            monthLabel={formatMonthLabel(referenceMonth)}
             rows={passengerIds.map((passengerId) => {
               const computed =
                 addCents(
