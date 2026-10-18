@@ -109,7 +109,7 @@ export function PassengerCard({
 
       {historyOpen && (
         <div className="mt-3 border-t border-black/10 pt-3">
-          <p className="mb-2 text-xs font-medium capitalize opacity-70">
+          <p className="mb-2 text-xs font-medium opacity-70">
             Diárias de {formatMonthLabel(referenceMonth)}
           </p>
 
