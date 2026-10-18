@@ -1,5 +1,8 @@
 import type { Passenger } from "@/types/entities";
 
+const RADIUS = 29;
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+
 export function DailySummary({
   passengers,
   registeredIds,
@@ -11,21 +14,44 @@ export function DailySummary({
 }) {
   const active = passengers.filter((passenger) => passenger.active);
   const registered = active.filter((passenger) => registeredIds.has(passenger.id)).length;
+  const remaining = active.length - registered;
+  const filled = active.length > 0 ? (registered / active.length) * CIRCUMFERENCE : 0;
+
   return (
-    <div className="context-summary" aria-label="Registros dos passageiros ativos">
-      <p className="text-xl font-semibold tabular-nums">
-        {registered} de {active.length}
-      </p>
-      <div className="min-w-0 space-y-2">
-        <p className="text-sm text-muted-foreground">
-          {registered === 1 ? "carona registrada" : "caronas registradas"}{" "}
-          {isToday ? "hoje" : "nesta data"} · passageiros ativos
+    <div className="day-card" aria-label="Registros dos passageiros ativos">
+      {active.length > 0 && (
+        <div className="day-ring">
+          <svg viewBox="0 0 68 68" aria-hidden="true">
+            <circle className="day-ring__track" cx="34" cy="34" r={RADIUS} />
+            <circle
+              className="day-ring__value"
+              cx="34"
+              cy="34"
+              r={RADIUS}
+              strokeDasharray={`${filled} ${CIRCUMFERENCE}`}
+            />
+          </svg>
+          <span className="day-ring__label" aria-hidden="true">
+            {registered}
+            <span className="font-medium text-muted-foreground">/{active.length}</span>
+          </span>
+        </div>
+      )}
+
+      <div className="min-w-0 space-y-1">
+        <p className="stat-value text-xl">
+          {registered} de {active.length}
         </p>
-        {active.length > 0 && (
-          <div className="daily-progress" aria-hidden="true">
-            <span style={{ width: `${(registered / active.length) * 100}%` }} />
-          </div>
-        )}
+        <p className="text-sm leading-snug text-muted-foreground">
+          {registered === 1 ? "carona registrada" : "caronas registradas"}{" "}
+          {isToday ? "hoje" : "nesta data"}
+          {remaining > 0 && (
+            <>
+              {" · falta"}
+              {remaining > 1 ? `m ${remaining} passageiros` : " 1 passageiro"}
+            </>
+          )}
+        </p>
       </div>
     </div>
   );

@@ -108,13 +108,13 @@ export function RidesPage() {
         <h1 className="page-heading">Diárias</h1>
         <div className="ride-date-context">
           <div className="min-w-0 space-y-1">
-            <p className="text-sm font-medium text-muted-foreground">
+            <p className="stat-label first-letter:uppercase">
               {formatMonthLabel(referenceMonth)}
             </p>
             {validDate ? (
               <time
                 dateTime={selectedDate}
-                className="block text-xl font-semibold leading-7 tracking-tight tabular-nums sm:text-2xl sm:leading-8"
+                className="stat-value block text-[2.25rem] leading-[1.05] sm:text-[2.5rem]"
               >
                 {selectedDate === today ? "Hoje" : formatDateDisplay(selectedDate)}
               </time>

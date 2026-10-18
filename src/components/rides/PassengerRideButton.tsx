@@ -3,6 +3,7 @@ import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/utils/currency";
 import { formatDateDisplay } from "@/utils/date";
+import { initials } from "@/utils/initials";
 import type { Passenger, Ride } from "@/types/entities";
 
 interface PassengerRideButtonProps {
@@ -30,7 +31,7 @@ export function PassengerRideButton({
   const sortedRides = [...monthRides].sort((a, b) => (a.rideDate < b.rideDate ? 1 : -1));
 
   return (
-    <div className="py-3">
+    <div className="py-0.5">
       <div className="space-y-1">
         <button
           type="button"
@@ -41,27 +42,41 @@ export function PassengerRideButton({
           aria-describedby={`${historyId}-rate`}
           className="ride-register-row focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
         >
-          <span className="col-span-2 min-w-0">
-            <span className="block break-words text-base font-semibold leading-6 [overflow-wrap:anywhere]">
+          <span
+            aria-hidden="true"
+            className={registered ? "avatar avatar--done" : "avatar"}
+          >
+            {initials(passenger.name)}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block break-words text-[0.9375rem] font-semibold leading-5 [overflow-wrap:anywhere]">
               {passenger.name}
+            </span>
+            <span
+              id={`${historyId}-rate`}
+              className="mt-0.5 block text-xs text-muted-foreground"
+            >
+              <span className="sr-only">Diária </span>
+              <span className="tabular-nums [overflow-wrap:anywhere]">
+                {formatCurrency(passenger.defaultDailyRate)}
+              </span>
+              <span>{registered ? " · registrado" : " padrão"}</span>
             </span>
           </span>
           <span
-            id={`${historyId}-rate`}
-            className="min-w-0 text-sm text-muted-foreground"
+            className={
+              registered ? "ride-register-action ride-register-action--done" : "ride-register-action"
+            }
           >
-            <span className="sr-only">Diária </span>
-            <span className="text-base font-medium tabular-nums text-foreground [overflow-wrap:anywhere]">
-              {formatCurrency(passenger.defaultDailyRate)}
-            </span>
-            <span className="ml-2">padrão</span>
-          </span>
-          <span className="ride-register-action">
-            {registered && <Check aria-hidden="true" className="h-4 w-4" />}
+            {registered && (
+              <Check aria-hidden="true" className="ride-check-in h-5 w-5 motion-reduce:animate-none" />
+            )}
             {!registered && !registering && (
               <Plus aria-hidden="true" className="h-4 w-4" />
             )}
-            {registered ? "Registrado" : registering ? "Registrando..." : "Registrar"}
+            <span className={registered ? "sr-only" : undefined}>
+              {registered ? "Registrado" : registering ? "Registrando..." : "Registrar"}
+            </span>
           </span>
         </button>
 
@@ -79,7 +94,7 @@ export function PassengerRideButton({
           aria-label={expanded ? "Esconder histórico do mês" : "Ver histórico do mês"}
           aria-expanded={expanded}
           aria-controls={historyId}
-          className="inline-flex min-h-11 items-center gap-1.5 rounded-[0.5rem] px-1 text-sm font-medium text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-[0.5rem] px-3 text-xs font-semibold text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         >
           Histórico do mês
           <ChevronDown
@@ -89,7 +104,7 @@ export function PassengerRideButton({
         </button>
       </div>
 
-      <div id={historyId} hidden={!expanded} className="ride-history">
+      <div id={historyId} hidden={!expanded} className="ride-history ml-6">
         {sortedRides.length === 0 ? (
           <p className="py-2 text-sm text-muted-foreground">
             Nenhuma diária registrada neste mês.
