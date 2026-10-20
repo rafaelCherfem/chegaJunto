@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { BillingSummary } from "@/components/charges/BillingSummary";
 import { MonthlyChargeCard } from "@/components/charges/MonthlyChargeCard";
 import { addCents, debtLabel, toCents } from "@/utils/money";
 const props = { passengerName: "Pessoa", amount: 10, status: "closed" as const, rideAmount: 10, compensationAmount: 0, paid: false, toggling: false, generatingReceipt: false, onMarkPaid: vi.fn(), onUnmarkPaid: vi.fn(), onGenerateReceipt: vi.fn() };
@@ -21,4 +22,11 @@ describe("integral payment card", () => {
     view.rerender(<MonthlyChargeCard {...props} amount={0} paid />); expect(screen.queryByText("Pago")).toBeNull(); expect(screen.queryByText("Marcar como pago")).toBeNull();
   });
   it("outdated charge cannot be paid or cancelled", () => { render(<MonthlyChargeCard {...props} status="outdated" computedAmount={20} />); expect(screen.queryByText("Marcar como pago")).toBeNull(); });
+  it("partial charge shows only the outstanding amount as owed", () => { render(<MonthlyChargeCard {...props} amount={20} paidAmount={5} />); expect(screen.getByText(/Passageiro deve R\$\s15,00/)).toBeTruthy(); expect(screen.queryByText(/Passageiro deve R\$\s20,00/)).toBeNull(); expect(screen.getByText("Parcialmente pago")).toBeTruthy(); });
+});
+describe("billing summary", () => {
+  it("counts a settled charge with refund as paid and a partial one as pending", () => {
+    render(<BillingSummary rows={[{ amount: 0, paidAmount: 20, paid: true, status: "closed" }, { amount: 20, paidAmount: 5, paid: false, status: "closed" }]} />);
+    expect(screen.getByText(/1 pendente\b/)).toBeTruthy(); expect(screen.getByText(/1 paga\b/)).toBeTruthy();
+  });
 });

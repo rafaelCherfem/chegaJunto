@@ -78,14 +78,29 @@ export async function generateMonthlyReceipt({
 
   const cents = toCents(charge.totalAmount);
   writeLine(debtLabel(cents), { size: 11 });
-  if (charge.paid && cents !== 0) {
+  const paidCents = toCents(charge.paidAmount);
+  if (paidCents !== 0) {
     writeLine(`Pago: ${formatCurrency(charge.paidAmount)}`, { size: 11 });
   }
+  const outstandingCents = cents - paidCents;
+  if (!charge.paid && paidCents !== 0) {
+    writeLine(`Falta pagar: ${formatCurrency(outstandingCents / 100)}`, { size: 11 });
+  }
+  if (charge.paid && cents >= 0 && paidCents > cents) {
+    writeLine(`Saldo a devolver: ${formatCurrency((paidCents - cents) / 100)}`, {
+      size: 11,
+    });
+  }
 
-  writeLine(
-    cents === 0 ? "Situação: sem obrigação" : charge.paid ? "Situação: pago integralmente" : "Situação: pendente",
-    { size: 11, bold: charge.paid },
-  );
+  const situation =
+    cents === 0 && paidCents === 0
+      ? "Situação: sem obrigação"
+      : charge.paid
+        ? "Situação: pago integralmente"
+        : paidCents !== 0
+          ? "Situação: parcialmente pago"
+          : "Situação: pendente";
+  writeLine(situation, { size: 11, bold: charge.paid });
 
   cursorY -= 16;
   writeLine(`Comprovante gerado em ${formatDateDisplay(todayISODate())}`, {
