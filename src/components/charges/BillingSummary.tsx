@@ -2,13 +2,16 @@ import { toCents } from "@/utils/money";
 
 type BillingRow = {
   amount: number;
+  paidAmount?: number;
   paid: boolean;
   status: "closed" | "preview" | "outdated";
 };
 
 export function BillingSummary({ rows }: { rows: BillingRow[] }) {
   const obligations = rows.filter(
-    (row) => row.status === "closed" && toCents(row.amount) !== 0,
+    (row) =>
+      row.status === "closed" &&
+      (toCents(row.amount) !== 0 || toCents(row.paidAmount ?? 0) !== 0),
   );
   const pending = obligations.filter((row) => !row.paid).length;
   const paid = obligations.filter((row) => row.paid).length;
