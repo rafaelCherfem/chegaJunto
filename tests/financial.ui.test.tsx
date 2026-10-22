@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { BillingSummary } from "@/components/charges/BillingSummary";
+import { MonthHero } from "@/components/charges/MonthHero";
 import { MonthlyChargeCard } from "@/components/charges/MonthlyChargeCard";
 import { addCents, debtLabel, toCents } from "@/utils/money";
 const props = { passengerName: "Pessoa", amount: 10, status: "closed" as const, rideAmount: 10, compensationAmount: 0, paid: false, toggling: false, generatingReceipt: false, onMarkPaid: vi.fn(), onUnmarkPaid: vi.fn(), onGenerateReceipt: vi.fn() };
@@ -28,5 +29,12 @@ describe("billing summary", () => {
   it("counts a settled charge with refund as paid and a partial one as pending", () => {
     render(<BillingSummary rows={[{ amount: 0, paidAmount: 20, paid: true, status: "closed" }, { amount: 20, paidAmount: 5, paid: false, status: "closed" }]} />);
     expect(screen.getByText(/1 pendente\b/)).toBeTruthy(); expect(screen.getByText(/1 paga\b/)).toBeTruthy();
+  });
+});
+describe("month hero", () => {
+  it("splits a partial charge into paid and open, and shows overpayment as refund", () => {
+    render(<MonthHero monthLabel="outubro" rows={[{ amount: 100, paidAmount: 60, paid: false, status: "closed" }, { amount: 0, paidAmount: 20, paid: true, status: "closed" }]} />);
+    expect(screen.getAllByText(/^R\$\s40,00$/).length).toBeGreaterThan(0); expect(screen.getByText(/^R\$\s60,00$/)).toBeTruthy(); expect(screen.queryByText(/^R\$\s100,00$/)).toBeNull();
+    expect(screen.getByText(/Saldo a devolver: R\$\s20,00/)).toBeTruthy();
   });
 });

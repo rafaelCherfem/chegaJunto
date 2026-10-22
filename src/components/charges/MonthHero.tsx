@@ -5,6 +5,7 @@ import { addCents, toCents } from "@/utils/money";
 
 type BillingRow = {
   amount: number;
+  paidAmount?: number;
   paid: boolean;
   status: "closed" | "preview" | "outdated";
 };
@@ -16,19 +17,23 @@ interface MonthHeroProps {
 
 export function MonthHero({ rows, monthLabel }: MonthHeroProps) {
   const closed = rows.filter((row) => row.status === "closed");
-  // Só valores a favor entram no total a receber; saldos negativos são
-  // mostrados à parte para não se compensarem no número em destaque.
-  const receivable = closed.filter((row) => toCents(row.amount) > 0);
-
-  const pendingCents = receivable
-    .filter((row) => !row.paid)
-    .reduce((total, row) => addCents(total, toCents(row.amount)), 0);
-  const paidCents = receivable
-    .filter((row) => row.paid)
-    .reduce((total, row) => addCents(total, toCents(row.amount)), 0);
-  const refundCents = closed
-    .filter((row) => toCents(row.amount) < 0)
-    .reduce((total, row) => addCents(total, -toCents(row.amount)), 0);
+  // Só valores a favor entram no total a receber; saldos negativos e o que
+  // foi pago a mais são mostrados à parte para não se compensarem no destaque.
+  let pendingCents = 0;
+  let paidCents = 0;
+  let refundCents = 0;
+  for (const row of closed) {
+    const cents = toCents(row.amount);
+    if (cents < 0) {
+      refundCents = addCents(refundCents, -cents);
+      continue;
+    }
+    const alreadyPaid = toCents(row.paidAmount ?? 0);
+    const covered = row.paid ? cents : Math.min(Math.max(alreadyPaid, 0), cents);
+    paidCents = addCents(paidCents, covered);
+    pendingCents = addCents(pendingCents, cents - covered);
+    if (alreadyPaid > cents) refundCents = addCents(refundCents, alreadyPaid - cents);
+  }
 
   const totalCents = addCents(pendingCents, paidCents);
   const paidShare = totalCents > 0 ? (paidCents / totalCents) * 100 : 0;
