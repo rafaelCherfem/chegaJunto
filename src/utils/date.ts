@@ -30,6 +30,11 @@ export function todayISODate(now = new Date()): string {
   const part = (type: string) => parts.find((item) => item.type === type)!.value;
   return `${part("year").padStart(4, "0")}-${part("month")}-${part("day")}`;
 }
+export function isoDateFromTimestamp(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) throw new Error(invalidDate);
+  return todayISODate(date);
+}
 export function assertRecordDate(value: string, today = todayISODate()): void {
   if (compareCalendarDates(value, today) > 0) throw new Error(FUTURE_DATE_ERROR);
 }
