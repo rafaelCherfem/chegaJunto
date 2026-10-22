@@ -49,8 +49,8 @@ select throws_ok($$select public.pay_charge((pg_temp.c(1)).id,1)$$,'40001','STAL
 select ok((public.pay_charge((pg_temp.c(1)).id,(pg_temp.c(1)).revision)).paid,'pay increased obligation');
 update public.rides set rate_charged=9.10 where passenger_id='82000000-0000-0000-0000-000000000001' and ride_date='2025-01-01';
 select is((pg_temp.c(1)).total_amount,24::numeric,'reduction total');
-select ok(not (pg_temp.c(1)).paid,'reduction reopens pending');
-select ok((public.pay_charge((pg_temp.c(1)).id,(pg_temp.c(1)).revision)).paid,'pay reduced obligation');
+select ok((pg_temp.c(1)).paid,'reduction below amount received stays settled');
+select throws_ok($$select public.pay_charge((pg_temp.c(1)).id,(pg_temp.c(1)).revision)$$,'23514','NO_OBLIGATION','nothing left to charge after reduction');
 update public.received_rides set amount=40.30 where passenger_id='82000000-0000-0000-0000-000000000001';
 select is((pg_temp.c(1)).total_amount,-11::numeric,'positive to negative');
 select ok(not (pg_temp.c(1)).paid,'direction change reopens pending');

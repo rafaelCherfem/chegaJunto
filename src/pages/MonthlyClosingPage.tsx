@@ -250,6 +250,7 @@ export function MonthlyClosingPage() {
               const stored = chargesByPassenger.get(passengerId);
               return {
                 amount: stored?.totalAmount ?? computed,
+                paidAmount: stored?.paidAmount ?? 0,
                 paid: stored?.paid ?? false,
                 status: !stored
                   ? "preview"
@@ -304,6 +305,7 @@ export function MonthlyClosingPage() {
               rideAmount={rideAmount}
               compensationAmount={compensationAmount}
               paid={stored.paid}
+              paidAmount={stored.paidAmount}
               toggling={togglingId === stored.id}
               generatingReceipt={generatingId === stored.id}
               onMarkPaid={() => handleMarkPaid(stored.id, stored.revision)}
