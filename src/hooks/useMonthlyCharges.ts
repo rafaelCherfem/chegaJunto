@@ -1,6 +1,7 @@
 import { usePrivateQuery, usePrivateMutation } from "@/hooks/usePrivateQuery";
 import {
   calculateMonthlyCharges,
+  listChargePaymentEvents,
   listMonthlyCharges,
   markMonthlyChargePaid,
   unmarkMonthlyChargePaid,
@@ -12,6 +13,13 @@ export function useMonthlyCharges(referenceMonth: string) {
   return usePrivateQuery({
     queryKey: [...monthlyChargesKey, referenceMonth],
     queryFn: (scope) => listMonthlyCharges(referenceMonth, scope),
+  });
+}
+
+export function useChargePaymentEvents(referenceMonth: string) {
+  return usePrivateQuery({
+    queryKey: [...monthlyChargesKey, referenceMonth, "payments"],
+    queryFn: (scope) => listChargePaymentEvents(referenceMonth, scope),
   });
 }
 

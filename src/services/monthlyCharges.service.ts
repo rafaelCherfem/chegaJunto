@@ -1,9 +1,9 @@
 import { assertReferenceMonth } from "@/utils/date";
 import { requestSignal, type SessionScope } from "@/lib/sessionScope";
 import { errorMessages } from "@/constants/errorMessages";
-import { toMonthlyCharge } from "@/lib/mappers";
+import { toChargePaymentEvent, toMonthlyCharge } from "@/lib/mappers";
 import { supabase } from "@/lib/supabase";
-import type { MonthlyCharge } from "@/types/entities";
+import type { ChargePaymentEvent, MonthlyCharge } from "@/types/entities";
 function financialError(error: { code?: string; message?: string }): Error {
   if (error.code === "40001") return new Error("A cobrança mudou. Atualize os dados e repita a operação.");
   if (error.code === "23514" && error.message === "NO_OBLIGATION") return new Error("Nenhum valor pendente para registrar pagamento.");
@@ -24,6 +24,14 @@ export async function listMonthlyCharges(referenceMonth: string, scope?: Session
   scope?.assertCurrent();
   if (error) throw new Error(errorMessages.unexpected);
   return data.map(toMonthlyCharge);
+}
+export async function listChargePaymentEvents(referenceMonth: string, scope?: SessionScope): Promise<ChargePaymentEvent[]> {
+  assertReferenceMonth(referenceMonth);
+  const signal = requestSignal(scope);
+  const { data, error } = await supabase.from("monthly_charge_events").select("id,monthly_charge_id,kind,revision,signed_amount,related_payment_id").eq("reference_month", referenceMonth).in("kind", ["PAYMENT", "CANCEL"]).abortSignal(signal);
+  scope?.assertCurrent();
+  if (error) throw new Error(errorMessages.unexpected);
+  return data.map(toChargePaymentEvent);
 }
 export async function markMonthlyChargePaid(id: string, revision: number, scope?: SessionScope): Promise<MonthlyCharge> {
   const signal = requestSignal(scope);

@@ -11,6 +11,7 @@ interface MonthlyChargeCardProps {
   compensationAmount: number;
   paid: boolean;
   paidAmount?: number;
+  canUnmarkPaid?: boolean;
   toggling: boolean;
   generatingReceipt: boolean;
   onMarkPaid: () => void;
@@ -82,6 +83,7 @@ export function MonthlyChargeCard(props: MonthlyChargeCardProps) {
         <div className="charge-actions">
           {props.status === "closed" &&
             (cents !== 0 || paidCents !== 0) &&
+            (!settled || props.canUnmarkPaid) &&
             (settled ? (
               <Button
                 variant="secondary"
