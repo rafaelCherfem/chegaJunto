@@ -1,5 +1,6 @@
 import type { Database } from "@/types/database";
 import type {
+  ChargePaymentEvent,
   MonthlyCharge,
   Passenger,
   PassengerInvite,
@@ -12,6 +13,10 @@ type RideRow = Database["public"]["Tables"]["rides"]["Row"];
 type ReceivedRideRow = Database["public"]["Tables"]["received_rides"]["Row"];
 type MonthlyChargeRow = Database["public"]["Tables"]["monthly_charges"]["Row"];
 type PassengerInviteRow = Database["public"]["Tables"]["passenger_invites"]["Row"];
+type ChargePaymentEventRow = Pick<
+  Database["public"]["Tables"]["monthly_charge_events"]["Row"],
+  "id" | "monthly_charge_id" | "kind" | "revision" | "signed_amount" | "related_payment_id"
+>;
 
 export function toPassenger(row: PassengerRow): Passenger {
   return {
@@ -53,6 +58,17 @@ export function toPassengerInvite(row: PassengerInviteRow): PassengerInvite {
     usedAt: row.used_at,
     revokedAt: row.revoked_at,
     createdAt: row.created_at,
+  };
+}
+
+export function toChargePaymentEvent(row: ChargePaymentEventRow): ChargePaymentEvent {
+  return {
+    id: row.id,
+    monthlyChargeId: row.monthly_charge_id,
+    kind: row.kind,
+    revision: row.revision,
+    signedAmount: row.signed_amount,
+    relatedPaymentId: row.related_payment_id,
   };
 }
 
