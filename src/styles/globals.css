@@ -580,6 +580,15 @@
   .ride-check-in {
     animation: ride-check-in 320ms cubic-bezier(0.34, 1.4, 0.64, 1);
   }
+  /* Mesma duração do check: o fim de qualquer um encerra a confirmação. */
+  @keyframes avatar-pop {
+    50% {
+      transform: scale(1.14);
+    }
+  }
+  .avatar--pop {
+    animation: avatar-pop 320ms cubic-bezier(0.34, 1.4, 0.64, 1);
+  }
 
   .ride-history {
     @apply mt-2 pl-3;

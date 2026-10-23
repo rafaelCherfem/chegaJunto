@@ -10,9 +10,11 @@ interface PassengerRideButtonProps {
   passenger: Passenger;
   registered: boolean;
   registering: boolean;
+  justRegistered?: boolean;
   monthRides: Ride[];
   deletingId: string | null;
   onRegister: (passenger: Passenger) => void;
+  onRegisteredAnimationEnd?: () => void;
   onDeleteRide: (ride: Ride) => void;
 }
 
@@ -20,11 +22,14 @@ export function PassengerRideButton({
   passenger,
   registered,
   registering,
+  justRegistered = false,
   monthRides,
   deletingId,
   onRegister,
+  onRegisteredAnimationEnd,
   onDeleteRide,
 }: PassengerRideButtonProps) {
+  const celebrating = registered && justRegistered;
   const [expanded, setExpanded] = useState(false);
   const historyId = useId();
 
@@ -37,6 +42,7 @@ export function PassengerRideButton({
           type="button"
           disabled={registered || registering}
           onClick={() => onRegister(passenger)}
+          onAnimationEnd={celebrating ? onRegisteredAnimationEnd : undefined}
           aria-label={`${passenger.name} ${registered ? "Registrado" : registering ? "Registrando..." : "Registrar"}`}
           aria-busy={registering}
           aria-describedby={`${historyId}-rate`}
@@ -44,7 +50,13 @@ export function PassengerRideButton({
         >
           <span
             aria-hidden="true"
-            className={registered ? "avatar avatar--done" : "avatar"}
+            className={
+              registered
+                ? celebrating
+                  ? "avatar avatar--done avatar--pop"
+                  : "avatar avatar--done"
+                : "avatar"
+            }
           >
             {initials(passenger.name)}
           </span>
@@ -69,7 +81,10 @@ export function PassengerRideButton({
             }
           >
             {registered && (
-              <Check aria-hidden="true" className="ride-check-in h-5 w-5 motion-reduce:animate-none" />
+              <Check
+                aria-hidden="true"
+                className={`h-5 w-5 ${celebrating ? "ride-check-in motion-reduce:animate-none" : ""}`}
+              />
             )}
             {!registered && !registering && (
               <Plus aria-hidden="true" className="h-4 w-4" />

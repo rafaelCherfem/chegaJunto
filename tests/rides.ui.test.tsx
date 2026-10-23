@@ -21,11 +21,24 @@ describe("botão de registrar diária", () => {
     expect(registerButton().getAttribute("aria-busy")).toBe("true");
     expect(screen.getByText("Registrando...")).toBeTruthy();
   });
-  it("registrado fica travado, com avatar verde e check", () => {
+  it("registrado fica travado, com avatar verde e check parado", () => {
     const { container } = render(<PassengerRideButton {...props} registered />);
     expect(registerButton()).toHaveProperty("disabled", true);
     expect(screen.getByText("AS").className).toContain("avatar--done");
-    expect(container.querySelector(".ride-check-in")).not.toBeNull();
+    expect(container.querySelector("svg.lucide-check")).not.toBeNull();
+    expect(container.querySelector(".ride-check-in, .avatar--pop")).toBeNull();
     expect(screen.getByText("Ana Souza: diária registrada.")).toBeTruthy();
+  });
+  it("acabou de registrar anima o check e o avatar e avisa quando a animação termina", () => {
+    const onEnd = vi.fn();
+    const { container } = render(<PassengerRideButton {...props} registered justRegistered onRegisteredAnimationEnd={onEnd} />);
+    expect(container.querySelector(".ride-check-in")).not.toBeNull();
+    expect(screen.getByText("AS").className).toContain("avatar--pop");
+    fireEvent.animationEnd(screen.getByText("AS"));
+    expect(onEnd).toHaveBeenCalledTimes(1);
+  });
+  it("justRegistered sem registro confirmado não anima", () => {
+    const { container } = render(<PassengerRideButton {...props} justRegistered />);
+    expect(container.querySelector(".ride-check-in, .avatar--pop")).toBeNull();
   });
 });
