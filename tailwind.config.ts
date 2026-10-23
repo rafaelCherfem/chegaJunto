@@ -39,8 +39,8 @@ export default {
         sm: "calc(var(--radius) - 8px)",
       },
       fontFamily: {
-        sans: ["Plus Jakarta Sans", "system-ui", "sans-serif"],
-        display: ["Space Grotesk", "system-ui", "sans-serif"],
+        sans: ["Barlow", "system-ui", "sans-serif"],
+        display: ["Saira", "system-ui", "sans-serif"],
       },
     },
   },

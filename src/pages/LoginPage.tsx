@@ -36,7 +36,7 @@ export function LoginPage() {
       <header className="space-y-6 lg:space-y-10">
         <BrandLogo className="text-2xl" />
         <div className="hidden space-y-5 lg:block">
-          <p className="max-w-xs text-3xl font-medium leading-tight tracking-tight">
+          <p className="login-tagline max-w-xs text-3xl leading-tight">
             Seu registro de caronas.
           </p>
           <p className="max-w-xs text-base leading-7 text-muted-foreground">

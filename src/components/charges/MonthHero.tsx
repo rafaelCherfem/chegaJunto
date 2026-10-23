@@ -45,7 +45,7 @@ export function MonthHero({ rows, monthLabel }: MonthHeroProps) {
         A receber em {monthLabel}
       </p>
 
-      <p className="stat-value mt-2.5 text-[2.75rem] leading-none">
+      <p className="stat-value mt-2.5 text-[clamp(2rem,10.5vw,2.75rem)] leading-none">
         <span className="sr-only">{formatCurrency(pendingCents / 100)}</span>
         <span aria-hidden="true">{formatCurrency(animated)}</span>
       </p>

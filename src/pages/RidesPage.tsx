@@ -121,7 +121,7 @@ export function RidesPage() {
             {validDate ? (
               <time
                 dateTime={selectedDate}
-                className="stat-value block text-[2.25rem] leading-[1.05] sm:text-[2.5rem]"
+                className="stat-value block text-[clamp(2rem,11vw,2.5rem)] leading-[1.05]"
               >
                 {selectedDate === today ? "Hoje" : formatDateDisplay(selectedDate)}
               </time>

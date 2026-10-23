@@ -2,6 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Fontes servidas pelo próprio app (licenças OFL em src/assets/fonts).
+   Saira: um recorte só, larga (wdth 125), itálica 800, para títulos e números.
+   Barlow: 400 cobre até 500 e 600 cobre do semibold para cima. */
+@font-face {
+  font-family: "Saira";
+  src: url("../assets/fonts/saira-wide-latin-800-italic.woff2") format("woff2");
+  font-weight: 500 900;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Barlow";
+  src: url("../assets/fonts/barlow-latin-400-normal.woff2") format("woff2");
+  font-weight: 100 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Barlow";
+  src: url("../assets/fonts/barlow-latin-600-normal.woff2") format("woff2");
+  font-weight: 600 900;
+  font-display: swap;
+}
+
 @layer base {
   :root {
     /* Dark-first: grafite estrutural, roxo de identidade, verde de confirmação. */
@@ -35,6 +58,13 @@
     --destructive: 4 70% 74%;
     --destructive-foreground: 240 8% 10%;
     --shadow-color: 240 20% 2%;
+    /* Profundidade em camadas: fio de luz, contato, meio e ambiente. */
+    --elevation:
+      inset 0 1px 0 hsl(0 0% 100% / 0.05),
+      0 1px 1px hsl(var(--shadow-color) / 0.35),
+      0 4px 8px -2px hsl(var(--shadow-color) / 0.35),
+      0 16px 32px -12px hsl(var(--shadow-color) / 0.55),
+      0 32px 64px -24px hsl(var(--shadow-color) / 0.5);
 
     --radius: 0.625rem;
     --page-gutter: 1rem;
@@ -54,6 +84,12 @@
       transparent 70%
     );
     background-repeat: no-repeat;
+    font-synthesis-weight: none;
+  }
+
+  h2 {
+    font-family: theme("fontFamily.display");
+    font-style: italic;
   }
 
   :focus-visible {
@@ -181,6 +217,7 @@
     background:
       linear-gradient(170deg, hsl(var(--identity) / 0.09), transparent 62%),
       hsl(var(--card));
+    box-shadow: var(--elevation);
   }
   .day-ring {
     position: relative;
@@ -206,7 +243,7 @@
     transition: stroke-dasharray 420ms cubic-bezier(0.22, 1, 0.36, 1);
   }
   .day-ring__label {
-    @apply absolute inset-0 flex items-center justify-center text-base font-bold tabular-nums;
+    @apply absolute inset-0 flex items-center justify-center text-base font-extrabold italic tabular-nums;
     font-family: theme("fontFamily.display");
   }
   .day-ring--complete > svg {
@@ -280,9 +317,7 @@
       hsl(0 0% 100% / 0.04),
       transparent 55%
     );
-    box-shadow:
-      inset 0 1px 0 hsl(0 0% 100% / 0.05),
-      0 14px 30px -18px hsl(var(--shadow-color) / 0.9);
+    box-shadow: var(--elevation);
   }
 
   /* Divisores antigos continuam visíveis sem reconstruir suas telas. */
@@ -291,7 +326,8 @@
   }
 
   .wordmark {
-    @apply text-lg font-semibold tracking-tight;
+    @apply text-lg font-extrabold italic tracking-[-0.02em];
+    font-family: theme("fontFamily.display");
     color: hsl(var(--foreground));
   }
 
@@ -374,22 +410,30 @@
   }
 
   .page-heading {
-    @apply text-[1.75rem] font-bold leading-tight tracking-[-0.03em] sm:text-3xl;
+    @apply text-[1.75rem] font-extrabold italic leading-tight tracking-[-0.035em] sm:text-3xl;
     font-family: theme("fontFamily.display");
   }
 
-  /* Números e rótulos de destaque usam a fonte de display. */
+  /* Números de destaque: Saira larga itálica. Rótulos: pequenos e espaçados. */
   .stat-value {
-    @apply font-bold tracking-[-0.03em] tabular-nums;
+    @apply font-extrabold italic tracking-[-0.02em] tabular-nums;
     font-family: theme("fontFamily.display");
   }
+  /* O número principal da tela ganha um brilho suave de identidade. */
+  .month-hero .stat-value,
+  .ride-date-context .stat-value {
+    text-shadow:
+      0 0 1px hsl(var(--foreground) / 0.35),
+      0 0 18px hsl(var(--identity) / 0.42),
+      0 0 44px hsl(var(--identity) / 0.22);
+  }
   .stat-label {
-    @apply text-[0.6875rem] font-bold uppercase tracking-[0.14em];
+    @apply text-[0.6875rem] font-semibold uppercase tracking-[0.2em];
     color: hsl(var(--identity));
   }
 
   .avatar {
-    @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[0.8125rem] font-bold uppercase;
+    @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[0.8125rem] font-extrabold italic uppercase;
     font-family: theme("fontFamily.display");
     background: hsl(var(--muted));
     color: hsl(var(--text-secondary));
@@ -437,10 +481,29 @@
     padding: 1.25rem;
     border: 1px solid hsl(var(--border) / 0.9);
     border-radius: 1.375rem;
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
     background:
       linear-gradient(165deg, hsl(var(--identity) / 0.13), transparent 58%),
       hsl(var(--card));
-    box-shadow: 0 20px 40px -26px hsl(var(--shadow-color) / 0.95);
+    box-shadow: var(--elevation);
+  }
+  /* Linhas finas de velocidade, atrás do conteúdo, sumindo para a esquerda. */
+  .month-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      linear-gradient(90deg, transparent, hsl(var(--identity) / 0.55), transparent) 100% 18% / 52% 1px no-repeat,
+      linear-gradient(90deg, transparent, hsl(var(--identity) / 0.3), transparent) 100% 27% / 78% 1px no-repeat,
+      linear-gradient(90deg, transparent, hsl(var(--confirmation) / 0.4), transparent) 100% 36% / 38% 1px no-repeat,
+      linear-gradient(90deg, transparent, hsl(var(--identity) / 0.22), transparent) 100% 45% / 66% 1px no-repeat,
+      linear-gradient(90deg, transparent, hsl(var(--identity) / 0.45), transparent) 100% 54% / 28% 2px no-repeat;
+    -webkit-mask-image: linear-gradient(90deg, transparent 8%, #000 70%);
+    mask-image: linear-gradient(90deg, transparent 8%, #000 70%);
   }
   .month-hero .context-summary {
     margin-top: 1rem;
@@ -556,6 +619,7 @@
     @apply flex min-h-16 w-full items-center gap-3 rounded-2xl p-3 text-left transition-colors duration-150 motion-reduce:transition-none;
     border: 1px solid hsl(var(--border) / 0.8);
     background: hsl(var(--card));
+    box-shadow: var(--elevation);
   }
   .ride-register-row:enabled:hover {
     border-color: hsl(var(--identity) / 0.45);
@@ -642,8 +706,27 @@
     padding-bottom: calc(2.5rem + env(safe-area-inset-bottom, 0px));
   }
 
+  /* Painel do login: o próprio formulário, com respiro interno. */
   .login-form {
-    @apply w-full max-w-sm;
+    @apply w-full max-w-sm p-6 sm:p-7;
+    border: 1px solid hsl(var(--border) / 0.7);
+    border-radius: 1.25rem;
+    background:
+      linear-gradient(180deg, hsl(0 0% 100% / 0.04), transparent 55%),
+      hsl(var(--card));
+    box-shadow: var(--elevation);
+  }
+  .login-form h1,
+  .login-tagline {
+    font-family: theme("fontFamily.display");
+    font-style: italic;
+    font-weight: 800;
+  }
+  .login-form h1 {
+    letter-spacing: -0.035em;
+  }
+  .login-tagline {
+    letter-spacing: -0.02em;
   }
 
   @media (min-width: 1024px) {
@@ -690,7 +773,7 @@
       padding-inline: 3rem;
     }
     .login-form {
-      padding-block: 2rem;
+      padding: 2rem;
       justify-self: end;
     }
   }
