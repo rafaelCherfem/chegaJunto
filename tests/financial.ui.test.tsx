@@ -15,7 +15,8 @@ describe("integer financial domain", () => {
 describe("integral payment card", () => {
   it.each([10, -10])("pending %s can be paid in either direction", (amount) => { render(<MonthlyChargeCard {...props} amount={amount} />); fireEvent.click(screen.getByText("Marcar como pago")); expect(props.onMarkPaid).toHaveBeenCalled(); expect(screen.getByText(amount > 0 ? /Passageiro deve/ : /Você deve/)).toBeTruthy(); });
   it("zero never shows a payment or cancel button", () => { render(<MonthlyChargeCard {...props} amount={0} paid />); expect(screen.getByText("Nenhum valor pendente")).toBeTruthy(); expect(screen.queryByText("Marcar como pago")).toBeNull(); expect(screen.queryByText("Desmarcar pagamento")).toBeNull(); });
-  it("paid can be cancelled", () => { render(<MonthlyChargeCard {...props} paid />); fireEvent.click(screen.getByText("Desmarcar pagamento")); expect(props.onUnmarkPaid).toHaveBeenCalled(); expect(screen.getByText("Pago")).toBeTruthy(); });
+  it("paid can be cancelled", () => { render(<MonthlyChargeCard {...props} paid canUnmarkPaid />); fireEvent.click(screen.getByText("Desmarcar pagamento")); expect(props.onUnmarkPaid).toHaveBeenCalled(); expect(screen.getByText("Pago")).toBeTruthy(); });
+  it("paid without a payment to undo shows no cancel button", () => { render(<MonthlyChargeCard {...props} amount={12} paidAmount={27} paid />); expect(screen.getByText("Pago")).toBeTruthy(); expect(screen.queryByText("Desmarcar pagamento")).toBeNull(); expect(screen.queryByText("Marcar como pago")).toBeNull(); });
   it("same total stays paid; change reopens pending; zero has no obligation", () => {
     const view = render(<MonthlyChargeCard {...props} paid />);
     view.rerender(<MonthlyChargeCard {...props} paid />); expect(screen.getByText("Pago")).toBeTruthy();

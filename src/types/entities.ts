@@ -54,3 +54,12 @@ export interface MonthlyCharge {
   paidAt: string | null;
   createdAt: string;
 }
+
+export interface ChargePaymentEvent {
+  id: string;
+  monthlyChargeId: string;
+  kind: "PAYMENT" | "CANCEL" | "REOPEN";
+  revision: number;
+  signedAmount: number;
+  relatedPaymentId: string | null;
+}

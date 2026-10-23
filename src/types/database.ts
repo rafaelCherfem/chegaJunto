@@ -106,6 +106,23 @@ export interface Database {
         };
         Relationships: [];
       };
+      monthly_charge_events: {
+        Row: {
+          id: string;
+          monthly_charge_id: string;
+          user_id: string;
+          passenger_id: string;
+          reference_month: string;
+          revision: number;
+          kind: "PAYMENT" | "CANCEL" | "REOPEN";
+          signed_amount: number;
+          related_payment_id: string | null;
+          occurred_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       received_rides: {
         Row: {
           id: string;

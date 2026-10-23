@@ -1,112 +1,173 @@
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import { formatCurrency } from "@/utils/currency";
 import { debtLabel, toCents } from "@/utils/money";
-import { formatDateDisplay, formatMonthLabel, todayISODate } from "@/utils/date";
-import type { MonthlyCharge, Passenger, Ride } from "@/types/entities";
+import {
+  formatDateDisplay,
+  formatMonthLabel,
+  isoDateFromTimestamp,
+  todayISODate,
+} from "@/utils/date";
+import type { MonthlyCharge, Passenger, ReceivedRide, Ride } from "@/types/entities";
 
 interface ReceiptData {
   passenger: Passenger;
   charge: MonthlyCharge;
   rides: Ride[];
+  receivedRides: ReceivedRide[];
   referenceMonth: string;
+}
+
+export interface ReceiptLine {
+  text: string;
+  size?: number;
+  bold?: boolean;
+  gray?: boolean;
+  spaceBefore?: number;
 }
 
 const PAGE_WIDTH = 595.28;
 const PAGE_HEIGHT = 841.89;
 const MARGIN = 48;
 
-export async function generateMonthlyReceipt({
-  passenger,
-  charge,
-  rides,
-  referenceMonth,
-}: ReceiptData): Promise<Uint8Array> {
+const byDate = <T>(key: (item: T) => string) => (a: T, b: T) =>
+  key(a) < key(b) ? -1 : 1;
+
+function receiptSituation(charge: MonthlyCharge): ReceiptLine[] {
+  const cents = toCents(charge.totalAmount);
+  const paidCents = toCents(charge.paidAmount);
+
+  if (cents === 0 && paidCents === 0) {
+    return [{ text: debtLabel(0) }, { text: "Situação: sem obrigação" }];
+  }
+
+  if (charge.paid) {
+    const paidOn = charge.paidAt
+      ? ` em ${formatDateDisplay(isoDateFromTimestamp(charge.paidAt))}`
+      : "";
+    const refundCents = cents >= 0 && paidCents > cents ? paidCents - cents : 0;
+    const lines: ReceiptLine[] = [];
+    if (paidCents > 0) lines.push({ text: `Já pago: ${formatCurrency(paidCents / 100)}` });
+    if (refundCents > 0) {
+      lines.push({ text: `Saldo a devolver: ${formatCurrency(refundCents / 100)}` });
+      lines.push({ text: `Situação: quitado${paidOn}, com saldo a devolver`, bold: true });
+    } else {
+      lines.push({ text: `Situação: pago integralmente${paidOn}`, bold: true });
+    }
+    return lines;
+  }
+
+  if (paidCents !== 0) {
+    return [
+      { text: `Já pago: ${formatCurrency(paidCents / 100)}` },
+      { text: `Falta pagar: ${formatCurrency((cents - paidCents) / 100)}` },
+      { text: "Situação: parcialmente pago" },
+    ];
+  }
+
+  return [{ text: debtLabel(cents) }, { text: "Situação: pendente" }];
+}
+
+export function buildReceiptLines(
+  { passenger, charge, rides, receivedRides, referenceMonth }: ReceiptData,
+  generatedOn = todayISODate(),
+): ReceiptLine[] {
+  const lines: ReceiptLine[] = [
+    { text: "RideLedger", size: 20, bold: true },
+    {
+      text: `Comprovante de diárias — ${formatMonthLabel(referenceMonth)}`,
+      size: 12,
+      gray: true,
+    },
+    { text: `Passageiro: ${passenger.name}`, bold: true, size: 13, spaceBefore: 8 },
+    { text: "Diárias registradas", bold: true, spaceBefore: 8 },
+  ];
+
+  const sortedRides = [...rides].sort(byDate((ride) => ride.rideDate));
+  if (sortedRides.length === 0) {
+    lines.push({ text: "Nenhuma diária registrada nesta competência.", gray: true });
+  }
+  for (const ride of sortedRides) {
+    lines.push({
+      text: `${formatDateDisplay(ride.rideDate)}  —  ${formatCurrency(ride.rateCharged)}`,
+      size: 10,
+    });
+  }
+
+  const sortedReceived = [...receivedRides].sort(byDate((item) => item.receivedDate));
+  if (sortedReceived.length > 0) {
+    lines.push({ text: "Compensações", bold: true, spaceBefore: 8 });
+    for (const received of sortedReceived) {
+      lines.push({
+        text: `${formatDateDisplay(received.receivedDate)}  —  ${formatCurrency(received.amount)}`,
+        size: 10,
+      });
+    }
+  }
+
+  const rideCents = sortedRides.reduce((sum, ride) => sum + toCents(ride.rateCharged), 0);
+  const compensationCents = sortedReceived.reduce(
+    (sum, received) => sum + toCents(received.amount),
+    0,
+  );
+  if (compensationCents > 0) {
+    lines.push({ text: `Diárias: ${formatCurrency(rideCents / 100)}`, spaceBefore: 8 });
+    lines.push({ text: `Compensação: -${formatCurrency(compensationCents / 100)}` });
+  }
+
+  lines.push({
+    text: `Total do mês: ${formatCurrency(charge.totalAmount)}`,
+    bold: true,
+    size: 14,
+    spaceBefore: compensationCents > 0 ? 4 : 8,
+  });
+  lines.push(...receiptSituation(charge));
+
+  lines.push({
+    text: `Comprovante gerado em ${formatDateDisplay(generatedOn)}`,
+    size: 8,
+    gray: true,
+    spaceBefore: 16,
+  });
+
+  return lines;
+}
+
+export function stripUnsupported(text: string, supported: Set<number>): string {
+  let result = "";
+  let removed = false;
+  for (const char of text) {
+    if (!supported.has(char.codePointAt(0)!)) {
+      removed = true;
+      continue;
+    }
+    if (removed && char === " " && (result === "" || result.endsWith(" "))) continue;
+    result += char;
+    removed = false;
+  }
+  return removed ? result.trimEnd() : result;
+}
+
+export async function generateMonthlyReceipt(data: ReceiptData): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
   const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const supported = new Set(font.getCharacterSet());
 
   let cursorY = PAGE_HEIGHT - MARGIN;
 
-  function writeLine(
-    text: string,
-    options: { size?: number; bold?: boolean; gray?: boolean } = {},
-  ) {
-    const size = options.size ?? 11;
-    page.drawText(text, {
+  for (const line of buildReceiptLines(data)) {
+    const size = line.size ?? 11;
+    cursorY -= line.spaceBefore ?? 0;
+    page.drawText(stripUnsupported(line.text, supported), {
       x: MARGIN,
       y: cursorY,
       size,
-      font: options.bold ? boldFont : font,
-      color: options.gray ? rgb(0.45, 0.45, 0.45) : rgb(0, 0, 0),
+      font: line.bold ? boldFont : font,
+      color: line.gray ? rgb(0.45, 0.45, 0.45) : rgb(0, 0, 0),
     });
     cursorY -= size + 8;
   }
-
-  writeLine("RideLedger", { size: 20, bold: true });
-  writeLine(`Comprovante de diárias — ${formatMonthLabel(referenceMonth)}`, {
-    size: 12,
-    gray: true,
-  });
-  cursorY -= 8;
-
-  writeLine(`Passageiro: ${passenger.name}`, { bold: true, size: 13 });
-  cursorY -= 8;
-
-  writeLine("Diárias registradas", { bold: true, size: 11 });
-
-  const sortedRides = [...rides].sort((a, b) =>
-    a.rideDate < b.rideDate ? -1 : 1,
-  );
-
-  if (sortedRides.length === 0) {
-    writeLine("Nenhuma diária registrada nesta competência.", { gray: true });
-  } else {
-    for (const ride of sortedRides) {
-      writeLine(
-        `${formatDateDisplay(ride.rideDate)}  —  ${formatCurrency(ride.rateCharged)}`,
-        { size: 10 },
-      );
-    }
-  }
-
-  cursorY -= 8;
-  writeLine(`Total do mês: ${formatCurrency(charge.totalAmount)}`, {
-    bold: true,
-    size: 14,
-  });
-
-  const cents = toCents(charge.totalAmount);
-  writeLine(debtLabel(cents), { size: 11 });
-  const paidCents = toCents(charge.paidAmount);
-  if (paidCents !== 0) {
-    writeLine(`Pago: ${formatCurrency(charge.paidAmount)}`, { size: 11 });
-  }
-  const outstandingCents = cents - paidCents;
-  if (!charge.paid && paidCents !== 0) {
-    writeLine(`Falta pagar: ${formatCurrency(outstandingCents / 100)}`, { size: 11 });
-  }
-  if (charge.paid && cents >= 0 && paidCents > cents) {
-    writeLine(`Saldo a devolver: ${formatCurrency((paidCents - cents) / 100)}`, {
-      size: 11,
-    });
-  }
-
-  const situation =
-    cents === 0 && paidCents === 0
-      ? "Situação: sem obrigação"
-      : charge.paid
-        ? "Situação: pago integralmente"
-        : paidCents !== 0
-          ? "Situação: parcialmente pago"
-          : "Situação: pendente";
-  writeLine(situation, { size: 11, bold: charge.paid });
-
-  cursorY -= 16;
-  writeLine(`Comprovante gerado em ${formatDateDisplay(todayISODate())}`, {
-    size: 8,
-    gray: true,
-  });
 
   return pdfDoc.save();
 }

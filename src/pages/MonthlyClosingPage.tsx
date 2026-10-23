@@ -6,6 +6,7 @@ import { MonthlyChargeCard } from "@/components/charges/MonthlyChargeCard";
 import { Button } from "@/components/ui/button";
 import {
   useCalculateMonthlyCharges,
+  useChargePaymentEvents,
   useMarkMonthlyChargePaid,
   useMonthlyCharges,
   useUnmarkMonthlyChargePaid,
@@ -14,6 +15,7 @@ import { usePassengers } from "@/hooks/usePassengers";
 import { useReceivedRidesByMonth } from "@/hooks/useReceivedRides";
 import { useGenerateReceipt } from "@/hooks/useReceipt";
 import { useRidesByMonth } from "@/hooks/useRides";
+import { latestOpenPayment } from "@/utils/chargePayments";
 import {
   currentMonthStart,
   formatMonthLabel,
@@ -45,6 +47,7 @@ export function MonthlyClosingPage() {
     isLoading: loadingCharges,
     isError: chargesError,
   } = useMonthlyCharges(referenceMonth);
+  const { data: paymentEvents } = useChargePaymentEvents(referenceMonth);
 
   const calculate = useCalculateMonthlyCharges();
   const markPaid = useMarkMonthlyChargePaid();
@@ -294,6 +297,11 @@ export function MonthlyClosingPage() {
           }
 
           const outdated = !amountsMatch(stored.totalAmount, computed);
+          const cancelablePaymentId = latestOpenPayment(
+            paymentEvents ?? [],
+            stored.id,
+            stored.paidAmount,
+          );
 
           return (
             <MonthlyChargeCard
@@ -306,12 +314,13 @@ export function MonthlyClosingPage() {
               compensationAmount={compensationAmount}
               paid={stored.paid}
               paidAmount={stored.paidAmount}
+              canUnmarkPaid={cancelablePaymentId !== null}
               toggling={togglingId === stored.id}
               generatingReceipt={generatingId === stored.id}
               onMarkPaid={() => handleMarkPaid(stored.id, stored.revision)}
               onUnmarkPaid={() =>
-                stored.activePaymentId &&
-                handleUnmarkPaid(stored.id, stored.activePaymentId)
+                cancelablePaymentId &&
+                handleUnmarkPaid(stored.id, cancelablePaymentId)
               }
               onGenerateReceipt={() =>
                 passenger && handleGenerateReceipt(passenger, stored)
