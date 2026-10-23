@@ -220,18 +220,6 @@
     flex: 1 1 14rem;
     min-width: 0;
   }
-  .daily-progress {
-    height: 3px;
-    width: 6rem;
-    border-radius: 2px;
-    overflow: hidden;
-    background: hsl(var(--muted));
-  }
-  .daily-progress > span {
-    display: block;
-    height: 100%;
-    background: hsl(var(--confirmation));
-  }
   @media (min-width: 375px) {
     .route-decoration__top {
       width: 330px;

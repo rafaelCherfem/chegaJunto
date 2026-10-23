@@ -26,7 +26,7 @@ describe("resumos de apresentação", () => {
     expect(screen.getByText(/carona registrada hoje/)).toBeTruthy();
   });
   it("identifica uma data selecionada que não é hoje", () => {
-    render(
+    const { container } = render(
       <DailySummary
         passengers={[passenger("A")]}
         registeredIds={new Set()}
@@ -35,6 +35,7 @@ describe("resumos de apresentação", () => {
     );
     expect(screen.getByText("0 de 1")).toBeTruthy();
     expect(screen.getByText(/caronas registradas nesta data/)).toBeTruthy();
+    expect(container.querySelector(".day-ring")).not.toBeNull();
   });
   it("não mostra progresso nem divisão por zero sem passageiros ativos", () => {
     const { container } = render(
@@ -45,7 +46,7 @@ describe("resumos de apresentação", () => {
       />,
     );
     expect(screen.getByText("0 de 0")).toBeTruthy();
-    expect(container.querySelector(".daily-progress")).toBeNull();
+    expect(container.querySelector(".day-ring")).toBeNull();
   });
   it("distingue obrigação, saldo zero, prévia e fechamento desatualizado", () => {
     render(
