@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Plus, Trash2 } from "lucide-react";
+import { Check, ChevronDown, LoaderCircle, Plus, Trash2 } from "lucide-react";
 import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/utils/currency";
@@ -46,6 +46,7 @@ export function PassengerRideButton({
           aria-label={`${passenger.name} ${registered ? "Registrado" : registering ? "Registrando..." : "Registrar"}`}
           aria-busy={registering}
           aria-describedby={`${historyId}-rate`}
+          data-state={registered ? "registered" : registering ? "registering" : "idle"}
           className="ride-register-row focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
         >
           <span
@@ -85,6 +86,9 @@ export function PassengerRideButton({
                 aria-hidden="true"
                 className={`h-5 w-5 ${celebrating ? "ride-check-in motion-reduce:animate-none" : ""}`}
               />
+            )}
+            {registering && !registered && (
+              <LoaderCircle aria-hidden="true" className="h-4 w-4 animate-spin" />
             )}
             {!registered && !registering && (
               <Plus aria-hidden="true" className="h-4 w-4" />

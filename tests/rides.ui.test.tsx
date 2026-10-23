@@ -15,11 +15,22 @@ describe("botão de registrar diária", () => {
     expect(screen.getByText("AS").className).toBe("avatar");
     expect(container.querySelector(".ride-check-in")).toBeNull();
   });
-  it("registrando bloqueia um segundo toque", () => {
-    render(<PassengerRideButton {...props} registering />);
+  it("registrando bloqueia um segundo toque, mostra o indicador e ainda não fica verde", () => {
+    const { container } = render(<PassengerRideButton {...props} registering />);
     expect(registerButton()).toHaveProperty("disabled", true);
     expect(registerButton().getAttribute("aria-busy")).toBe("true");
+    expect(registerButton().dataset.state).toBe("registering");
     expect(screen.getByText("Registrando...")).toBeTruthy();
+    expect(container.querySelector("svg.animate-spin")).not.toBeNull();
+    expect(container.querySelector("svg.lucide-plus, svg.lucide-check")).toBeNull();
+    expect(screen.getByText("AS").className).toBe("avatar");
+  });
+  it("cada estado tem o seu data-state, e só o registrado usa o verde", () => {
+    const view = render(<PassengerRideButton {...props} />);
+    expect(registerButton().dataset.state).toBe("idle");
+    view.rerender(<PassengerRideButton {...props} registered />);
+    expect(registerButton().dataset.state).toBe("registered");
+    expect(view.container.querySelector("svg.animate-spin")).toBeNull();
   });
   it("registrado fica travado, com avatar verde e check parado", () => {
     const { container } = render(<PassengerRideButton {...props} registered />);
