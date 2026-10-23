@@ -72,7 +72,7 @@ export function buildReceiptLines(
   generatedOn = todayISODate(),
 ): ReceiptLine[] {
   const lines: ReceiptLine[] = [
-    { text: "RideLedger", size: 20, bold: true },
+    { text: "chegaJunto", size: 20, bold: true },
     {
       text: `Comprovante de diárias — ${formatMonthLabel(referenceMonth)}`,
       size: 12,

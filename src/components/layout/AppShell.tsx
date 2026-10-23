@@ -1,4 +1,4 @@
-import { RideLedgerBrand } from "@/components/brand/RideLedgerBrand";
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import { RouteDecoration } from "@/components/brand/RouteDecoration";
 import { ArrowLeftRight, Car, Flag, LogOut, Receipt, Users } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
@@ -25,7 +25,7 @@ export function AppShell() {
       <RouteDecoration />
       <header className="app-shell__header">
         <div className="flex items-center justify-between gap-4 lg:justify-end">
-          <RideLedgerBrand className="lg:hidden" />
+          <BrandLogo className="lg:hidden" />
           <Button
             variant="ghost"
             size="icon"
@@ -47,7 +47,7 @@ export function AppShell() {
         aria-label="Navegação principal"
         className="app-shell__nav fixed inset-x-0 bottom-0 z-10 border-t border-border bg-card/85 backdrop-blur-md"
       >
-        <RideLedgerBrand className="mb-8 hidden px-3 lg:inline-flex" />
+        <BrandLogo className="mb-8 hidden px-3 lg:inline-flex" />
         <div className="app-shell__nav-list">
           {navItems.map((item) => (
             <NavLink

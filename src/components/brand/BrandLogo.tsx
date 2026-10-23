@@ -1,11 +1,11 @@
 import { cn } from "@/lib/utils";
 
-export function RideLedgerBrand({ className }: { className?: string }) {
+export function BrandLogo({ className }: { className?: string }) {
   return (
-    <span className={cn("rideledger-brand wordmark", className)}>
+    <span className={cn("brand-logo wordmark", className)}>
       <svg
         viewBox="0 0 32 32"
-        className="rideledger-brand__mark"
+        className="brand-logo__mark"
         aria-hidden="true"
         focusable="false"
       >
@@ -26,8 +26,8 @@ export function RideLedgerBrand({ className }: { className?: string }) {
         />
         <circle cx="25" cy="9" r="1.5" fill="currentColor" />
       </svg>
-      <span className="rideledger-brand__name">
-        Ride<span>Ledger</span>
+      <span className="brand-logo__name">
+        chega<span>Junto</span>
       </span>
     </span>
   );

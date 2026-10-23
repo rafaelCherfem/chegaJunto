@@ -25,8 +25,8 @@ export default defineConfig({
         ],
       },
       manifest: {
-        name: "RideLedger",
-        short_name: "RideLedger",
+        name: "chegaJunto",
+        short_name: "chegaJunto",
         description: "Controle de diárias de carona.",
         theme_color: "#131316",
         background_color: "#131316",

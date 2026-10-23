@@ -124,7 +124,7 @@ export function InviteRedemptionPage() {
       <div className="w-full max-w-sm">
         <CarIllustration />
         <div className="surface mt-8 p-8">
-          <h1 className="text-2xl font-semibold tracking-tight">RideLedger</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">chegaJunto</h1>
           <p className="mt-1 text-sm opacity-70">
             Use o convite para acompanhar suas diárias.
           </p>

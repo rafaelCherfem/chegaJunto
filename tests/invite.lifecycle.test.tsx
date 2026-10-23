@@ -206,7 +206,7 @@ describe("invitation lifecycle", () => {
   });
   it("expired temporary storage is discarded", () => {
     sessionStorage.setItem(
-      "rideledger.pendingInvite",
+      "chegajunto.pendingInvite",
       JSON.stringify({ token, until: Date.now() - 1 }),
     );
     expect(recalledInvite()).toBeNull();

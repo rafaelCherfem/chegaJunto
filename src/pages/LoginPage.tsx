@@ -1,4 +1,4 @@
-import { RideLedgerBrand } from "@/components/brand/RideLedgerBrand";
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import { RouteDecoration } from "@/components/brand/RouteDecoration";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
@@ -34,7 +34,7 @@ export function LoginPage() {
     <main className="login-layout">
       <RouteDecoration />
       <header className="space-y-6 lg:space-y-10">
-        <RideLedgerBrand className="text-2xl" />
+        <BrandLogo className="text-2xl" />
         <div className="hidden space-y-5 lg:block">
           <p className="max-w-xs text-3xl font-medium leading-tight tracking-tight">
             Seu registro de caronas.

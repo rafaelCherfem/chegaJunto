@@ -69,22 +69,22 @@
 }
 
 @layer components {
-  .rideledger-brand {
+  .brand-logo {
     display: inline-flex;
     align-items: center;
     gap: 0.625rem;
     white-space: nowrap;
   }
-  .rideledger-brand__mark {
+  .brand-logo__mark {
     width: 1.75rem;
     height: 1.75rem;
     flex-shrink: 0;
     color: hsl(var(--identity));
   }
-  .wordmark .rideledger-brand__name {
+  .wordmark .brand-logo__name {
     color: hsl(var(--foreground));
   }
-  .wordmark .rideledger-brand__name > span {
+  .wordmark .brand-logo__name > span {
     color: hsl(var(--identity));
   }
   .app-shell,
