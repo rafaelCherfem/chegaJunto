@@ -116,7 +116,6 @@
     width: 1.75rem;
     height: 1.75rem;
     flex-shrink: 0;
-    color: hsl(var(--identity));
   }
   .brand-logo__wordmark {
     height: 0.82em;
