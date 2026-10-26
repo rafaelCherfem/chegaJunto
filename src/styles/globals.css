@@ -110,6 +110,7 @@
     align-items: center;
     gap: 0.625rem;
     white-space: nowrap;
+    @apply text-lg;
   }
   .brand-logo__mark {
     width: 1.75rem;
@@ -117,10 +118,13 @@
     flex-shrink: 0;
     color: hsl(var(--identity));
   }
-  .wordmark .brand-logo__name {
+  .brand-logo__wordmark {
+    height: 0.82em;
+    width: auto;
+    flex-shrink: 0;
     color: hsl(var(--foreground));
   }
-  .wordmark .brand-logo__name > span {
+  .brand-logo__accent {
     color: hsl(var(--identity));
   }
   .app-shell,
@@ -323,16 +327,6 @@
   /* Divisores antigos continuam visíveis sem reconstruir suas telas. */
   .surface .border-black\/10 {
     border-color: hsl(var(--border));
-  }
-
-  .wordmark {
-    @apply text-lg font-extrabold italic tracking-[-0.02em];
-    font-family: theme("fontFamily.display");
-    color: hsl(var(--foreground));
-  }
-
-  .wordmark span {
-    color: hsl(var(--identity));
   }
 
   .app-shell__header,
