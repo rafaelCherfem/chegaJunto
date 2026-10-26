@@ -1,5 +1,5 @@
 import { BrandLogo } from "@/components/brand/BrandLogo";
-import { RouteDecoration } from "@/components/brand/RouteDecoration";
+import { LoginBackdrop } from "@/components/brand/LoginBackdrop";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -32,18 +32,12 @@ export function LoginPage() {
 
   return (
     <main className="login-layout">
-      <RouteDecoration />
-      <header className="space-y-6 lg:space-y-10">
-        <BrandLogo className="text-2xl" />
-        <div className="hidden space-y-5 lg:block">
-          <p className="login-tagline max-w-xs text-3xl leading-tight">
-            Seu registro de caronas.
-          </p>
-          <p className="max-w-xs text-base leading-7 text-muted-foreground">
-            Diárias, compensações e fechamento mensal.
-          </p>
-          <div className="h-px w-12 bg-[hsl(var(--identity))]" aria-hidden="true" />
-        </div>
+      <LoginBackdrop />
+      <header className="space-y-6">
+        <BrandLogo className="brand-logo--hero" />
+        <p className="login-tagline hidden max-w-xs text-3xl leading-tight lg:block">
+          Seu registro de caronas.
+        </p>
       </header>
 
       <section className="login-form" aria-labelledby="login-title">
