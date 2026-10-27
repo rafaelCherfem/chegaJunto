@@ -2,7 +2,11 @@ import { MonthHero } from "@/components/charges/MonthHero";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useMemo, useState } from "react";
 import { addCents, toCents } from "@/utils/money";
-import { MonthlyChargeCard } from "@/components/charges/MonthlyChargeCard";
+import { ChargeSheet } from "@/components/charges/ChargeSheet";
+import {
+  MonthlyChargeCard,
+  type MonthlyChargeCardProps,
+} from "@/components/charges/MonthlyChargeCard";
 import { Button } from "@/components/ui/button";
 import {
   useCalculateMonthlyCharges,
@@ -58,6 +62,9 @@ export function MonthlyClosingPage() {
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [calculateError, setCalculateError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<{ id: string; month: string } | null>(null);
+  // O sheet pertence ao mês em que foi aberto: trocar de mês o fecha.
+  const selectedId = selected?.month === referenceMonth ? selected.id : null;
 
   const passengersById = useMemo(() => {
     const map = new Map<string, Passenger>();
@@ -167,6 +174,61 @@ export function MonthlyClosingPage() {
     }
   }
 
+  function chargeProps(passengerId: string): MonthlyChargeCardProps {
+    const rideAmount = (rideTotals.get(passengerId) ?? 0) / 100;
+    const compensationAmount = (compensationTotals.get(passengerId) ?? 0) / 100;
+    const computed =
+      addCents(
+        rideTotals.get(passengerId) ?? 0,
+        -(compensationTotals.get(passengerId) ?? 0),
+      ) / 100;
+    const stored = chargesByPassenger.get(passengerId);
+    const passenger = passengersById.get(passengerId);
+    const passengerName = passenger?.name ?? "Passageiro";
+
+    if (!stored) {
+      return {
+        passengerName,
+        amount: computed,
+        status: "preview",
+        rideAmount,
+        compensationAmount,
+        paid: false,
+        toggling: false,
+        generatingReceipt: false,
+        onMarkPaid: () => {},
+        onUnmarkPaid: () => {},
+        onGenerateReceipt: () => {},
+      };
+    }
+
+    const outdated = !amountsMatch(stored.totalAmount, computed);
+    const cancelablePaymentId = latestOpenPayment(
+      paymentEvents ?? [],
+      stored.id,
+      stored.paidAmount,
+    );
+
+    return {
+      passengerName,
+      amount: stored.totalAmount,
+      status: outdated ? "outdated" : "closed",
+      computedAmount: outdated ? computed : undefined,
+      rideAmount,
+      compensationAmount,
+      paid: stored.paid,
+      paidAmount: stored.paidAmount,
+      canUnmarkPaid: cancelablePaymentId !== null,
+      toggling: togglingId === stored.id,
+      generatingReceipt: generatingId === stored.id,
+      onMarkPaid: () => handleMarkPaid(stored.id, stored.revision),
+      onUnmarkPaid: () =>
+        cancelablePaymentId && handleUnmarkPaid(stored.id, cancelablePaymentId),
+      onGenerateReceipt: () => passenger && handleGenerateReceipt(passenger, stored),
+      onOpenDetails: () => setSelected({ id: passengerId, month: referenceMonth }),
+    };
+  }
+
   return (
     <div className="page--charges mx-auto space-y-5 p-6">
       <h1 className="page-heading">Cobranças</h1>
@@ -265,70 +327,19 @@ export function MonthlyClosingPage() {
           />
         )}
       <div className="financial-list">
-        {passengerIds.map((passengerId) => {
-          const rideAmount = (rideTotals.get(passengerId) ?? 0) / 100;
-          const compensationAmount = (compensationTotals.get(passengerId) ?? 0) / 100;
-          const computed =
-            addCents(
-              rideTotals.get(passengerId) ?? 0,
-              -(compensationTotals.get(passengerId) ?? 0),
-            ) / 100;
-          const stored = chargesByPassenger.get(passengerId);
-          const passenger = passengersById.get(passengerId);
-          const passengerName = passenger?.name ?? "Passageiro";
-
-          if (!stored) {
-            return (
-              <MonthlyChargeCard
-                key={passengerId}
-                passengerName={passengerName}
-                amount={computed}
-                status="preview"
-                rideAmount={rideAmount}
-                compensationAmount={compensationAmount}
-                paid={false}
-                toggling={false}
-                generatingReceipt={false}
-                onMarkPaid={() => {}}
-                onUnmarkPaid={() => {}}
-                onGenerateReceipt={() => {}}
-              />
-            );
-          }
-
-          const outdated = !amountsMatch(stored.totalAmount, computed);
-          const cancelablePaymentId = latestOpenPayment(
-            paymentEvents ?? [],
-            stored.id,
-            stored.paidAmount,
-          );
-
-          return (
-            <MonthlyChargeCard
-              key={passengerId}
-              passengerName={passengerName}
-              amount={stored.totalAmount}
-              status={outdated ? "outdated" : "closed"}
-              computedAmount={outdated ? computed : undefined}
-              rideAmount={rideAmount}
-              compensationAmount={compensationAmount}
-              paid={stored.paid}
-              paidAmount={stored.paidAmount}
-              canUnmarkPaid={cancelablePaymentId !== null}
-              toggling={togglingId === stored.id}
-              generatingReceipt={generatingId === stored.id}
-              onMarkPaid={() => handleMarkPaid(stored.id, stored.revision)}
-              onUnmarkPaid={() =>
-                cancelablePaymentId &&
-                handleUnmarkPaid(stored.id, cancelablePaymentId)
-              }
-              onGenerateReceipt={() =>
-                passenger && handleGenerateReceipt(passenger, stored)
-              }
-            />
-          );
-        })}
+        {passengerIds.map((passengerId) => (
+          <MonthlyChargeCard key={passengerId} {...chargeProps(passengerId)} />
+        ))}
       </div>
+
+      {selectedId && passengerIds.includes(selectedId) && (
+        <ChargeSheet
+          {...chargeProps(selectedId)}
+          monthLabel={formatMonthLabel(referenceMonth)}
+          open
+          onOpenChange={(open) => !open && setSelected(null)}
+        />
+      )}
     </div>
   );
 }

@@ -67,6 +67,7 @@
       0 32px 64px -24px hsl(var(--shadow-color) / 0.5);
 
     --radius: 0.625rem;
+    --speed-angle: 12deg;
     --page-gutter: 1rem;
     --content-width: 60rem;
   }
@@ -604,6 +605,9 @@
     @apply font-bold;
     color: hsl(var(--foreground));
   }
+  .month-hero__refund {
+    color: hsl(var(--attention));
+  }
   .month-hero__dot {
     width: 0.5rem;
     height: 0.5rem;
@@ -650,6 +654,184 @@
   }
   .charge-actions > button {
     @apply w-full max-w-full justify-start whitespace-normal text-left sm:w-auto;
+  }
+
+  /* Card tocável: a área de resumo abre o sheet; a ação principal fica fora dela. */
+  .charge-card__summary {
+    @apply relative block w-full min-w-0 rounded-lg text-left;
+    background: none;
+    border: 0;
+    padding: 0;
+    color: inherit;
+    cursor: pointer;
+  }
+  .charge-card__chevron {
+    @apply absolute bottom-1 right-0 h-5 w-5;
+    color: hsl(var(--text-subtle));
+  }
+
+  /* Bottom sheet no celular, painel lateral em lg. */
+  .sheet__overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: hsl(var(--shadow-color) / 0.64);
+    backdrop-filter: blur(2px);
+  }
+  .sheet {
+    position: fixed;
+    z-index: 50;
+    inset: auto 0 0 0;
+    max-height: 85svh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0 1.25rem calc(1.25rem + env(safe-area-inset-bottom));
+    border: 1px solid hsl(var(--border) / 0.9);
+    border-bottom: 0;
+    border-radius: 1.375rem 1.375rem 0 0;
+    isolation: isolate;
+    background:
+      linear-gradient(165deg, hsl(var(--identity) / 0.13), transparent 40%),
+      hsl(var(--card));
+    box-shadow: var(--elevation);
+  }
+  .sheet__grip {
+    @apply flex justify-center py-3;
+    touch-action: none;
+    cursor: grab;
+  }
+  .sheet__handle {
+    width: 2.5rem;
+    height: 0.25rem;
+    border-radius: 9999px;
+    background: hsl(var(--text-subtle) / 0.55);
+  }
+  .sheet__close {
+    @apply absolute right-3 top-3 inline-flex h-11 w-11 items-center justify-center rounded-lg;
+    color: hsl(var(--text-secondary));
+  }
+  .sheet__close:hover {
+    background: hsl(var(--muted));
+  }
+  /* Linhas de velocidade inclinadas em --speed-angle, atrás do cabeçalho. */
+  .sheet__header {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    margin: 0 -1.25rem;
+    padding: 0.25rem 1.25rem 0.5rem;
+  }
+  .sheet__header::before {
+    content: "";
+    position: absolute;
+    inset: -40% -10%;
+    z-index: -1;
+    pointer-events: none;
+    transform: rotate(calc(var(--speed-angle) * -1));
+    background:
+      linear-gradient(90deg, transparent, hsl(var(--identity) / 0.5), transparent) 100% 38% / 56% 1px no-repeat,
+      linear-gradient(90deg, transparent, hsl(var(--identity) / 0.28), transparent) 100% 48% / 78% 1px no-repeat,
+      linear-gradient(90deg, transparent, hsl(var(--confirmation) / 0.35), transparent) 100% 58% / 40% 1px no-repeat,
+      linear-gradient(90deg, transparent, hsl(var(--identity) / 0.4), transparent) 100% 68% / 30% 2px no-repeat;
+    -webkit-mask-image: linear-gradient(90deg, transparent 8%, #000 70%);
+    mask-image: linear-gradient(90deg, transparent 8%, #000 70%);
+  }
+  .sheet__details {
+    @apply grid gap-2 border-t border-border/60 pt-3 text-sm;
+  }
+  .sheet__details > div {
+    @apply flex items-baseline justify-between gap-4;
+  }
+  .sheet__details dt {
+    color: hsl(var(--text-secondary));
+  }
+  .sheet__details dd {
+    @apply font-semibold tabular-nums;
+  }
+  .sheet__actions {
+    @apply mt-5 grid gap-2;
+  }
+  .sheet__actions > button {
+    @apply w-full whitespace-normal;
+  }
+  /* Ação secundária: sem borda nem fundo, separada das principais. */
+  .sheet__undo {
+    @apply mt-3 border-t border-border/60 pt-3;
+  }
+  .sheet__undo > button {
+    @apply w-full whitespace-normal font-medium;
+    color: hsl(var(--text-secondary));
+  }
+
+  @keyframes sheet-fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes sheet-fade-out {
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes sheet-in-bottom {
+    from {
+      transform: translateY(100%);
+    }
+  }
+  @keyframes sheet-out-bottom {
+    to {
+      transform: translateY(100%);
+    }
+  }
+  @keyframes sheet-in-right {
+    from {
+      transform: translateX(100%);
+    }
+  }
+  @keyframes sheet-out-right {
+    to {
+      transform: translateX(100%);
+    }
+  }
+  .sheet__overlay[data-state="open"] {
+    animation: sheet-fade-in 200ms ease-out;
+  }
+  .sheet__overlay[data-state="closed"] {
+    animation: sheet-fade-out 160ms ease-in forwards;
+  }
+  .sheet[data-state="open"] {
+    animation: sheet-in-bottom 280ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .sheet[data-state="closed"] {
+    animation: sheet-out-bottom 200ms ease-in forwards;
+  }
+
+  @media (min-width: 1024px) {
+    .sheet {
+      inset: 0 0 0 auto;
+      width: 26rem;
+      max-height: none;
+      padding-top: 1.25rem;
+      border: 1px solid hsl(var(--border) / 0.9);
+      border-right: 0;
+      border-radius: 1.375rem 0 0 1.375rem;
+    }
+    .sheet__grip {
+      display: none;
+    }
+    .sheet[data-state="open"] {
+      animation-name: sheet-in-right;
+    }
+    .sheet[data-state="closed"] {
+      animation-name: sheet-out-right;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sheet,
+    .sheet__overlay {
+      animation: none !important;
+      transition: none !important;
+    }
   }
 
   .ride-list {
