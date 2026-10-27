@@ -606,7 +606,7 @@
     color: hsl(var(--foreground));
   }
   .month-hero__refund {
-    color: hsl(var(--attention));
+    color: hsl(var(--destructive));
   }
   .month-hero__dot {
     width: 0.5rem;
@@ -633,6 +633,11 @@
     background: hsl(var(--confirmation-background));
     color: hsl(var(--confirmation));
     box-shadow: inset 0 0 0 1px hsl(var(--confirmation) / 0.22);
+  }
+  .charge-status--refund {
+    background: hsl(var(--destructive) / 0.1);
+    color: hsl(var(--destructive));
+    box-shadow: inset 0 0 0 1px hsl(var(--destructive) / 0.25);
   }
   .charge-status--pending {
     background: hsl(var(--attention) / 0.1);

@@ -69,6 +69,7 @@ describe("ChargeSheet", () => {
 
   it("quitado com saldo a devolver: mostra o saldo e não cobra de novo", () => {
     render(<ChargeSheet {...sheetProps({ amount: 204, paidAmount: 254, paid: true })} />);
+    expect(screen.getByText("A devolver")).toBeTruthy();
     expect(screen.getByText("Saldo a devolver")).toBeTruthy();
     expect(screen.getByText(/^R\$\s50,00$/)).toBeTruthy();
     expect(screen.queryByText("Marcar como pago")).toBeNull();

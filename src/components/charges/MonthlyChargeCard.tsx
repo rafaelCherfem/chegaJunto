@@ -1,5 +1,6 @@
 import { Check, ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
+import { RefundChip } from "@/components/charges/RefundChip";
 import { Button } from "@/components/ui/button";
 import { chargeState, type ChargeStatus } from "@/utils/chargeState";
 import { formatCurrency } from "@/utils/currency";
@@ -47,7 +48,8 @@ export function MonthlyChargeCard(props: MonthlyChargeCardProps) {
               {props.status === "preview" ? "Prévia" : "Desatualizado"}
             </span>
           )}
-          {settled && hasObligation && (
+          {refundCents > 0 && <RefundChip />}
+          {settled && hasObligation && refundCents === 0 && (
             <span className="charge-status charge-status--paid">
               <Check className="h-3.5 w-3.5" aria-hidden="true" />
               Pago

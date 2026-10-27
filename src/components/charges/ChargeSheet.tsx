@@ -1,5 +1,6 @@
 import { Check, FileText, Undo2 } from "lucide-react";
 import type { MonthlyChargeCardProps } from "@/components/charges/MonthlyChargeCard";
+import { RefundChip } from "@/components/charges/RefundChip";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { chargeState } from "@/utils/chargeState";
@@ -47,6 +48,11 @@ export function ChargeSheet({ monthLabel, open, onOpenChange, ...props }: Charge
                 debtLabel(partial ? outstandingCents : cents)
               )}
             </p>
+            {refundCents > 0 && (
+              <div className="mt-2">
+                <RefundChip />
+              </div>
+            )}
           </div>
         </SheetDescription>
 
