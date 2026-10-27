@@ -1,4 +1,5 @@
 import { BillingSummary } from "@/components/charges/BillingSummary";
+import { CompleteMark } from "@/components/ui/complete-mark";
 import { useCountUp } from "@/hooks/useCountUp";
 import { formatCurrency } from "@/utils/currency";
 import { addCents, toCents } from "@/utils/money";
@@ -22,8 +23,10 @@ export function MonthHero({ rows, monthLabel }: MonthHeroProps) {
   let pendingCents = 0;
   let paidCents = 0;
   let refundCents = 0;
+  let unsettled = 0;
   for (const row of closed) {
     const cents = toCents(row.amount);
+    if (!row.paid && (cents !== 0 || toCents(row.paidAmount ?? 0) !== 0)) unsettled += 1;
     if (cents < 0) {
       refundCents = addCents(refundCents, -cents);
       continue;
@@ -36,6 +39,13 @@ export function MonthHero({ rows, monthLabel }: MonthHeroProps) {
   }
 
   const totalCents = addCents(pendingCents, paidCents);
+  // Mês fechado e recebido: algo a receber existiu, nada ficou em aberto e não há
+  // prévia nem cobrança desatualizada esperando cálculo. Um saldo a devolver não
+  // impede o selo; a linha de saldo a devolver continua visível abaixo.
+  const allReceived =
+    totalCents > 0 &&
+    unsettled === 0 &&
+    rows.every((row) => row.status === "closed");
   const paidShare = totalCents > 0 ? (paidCents / totalCents) * 100 : 0;
   const animated = useCountUp(pendingCents / 100);
 
@@ -49,6 +59,12 @@ export function MonthHero({ rows, monthLabel }: MonthHeroProps) {
         <span className="sr-only">{formatCurrency(pendingCents / 100)}</span>
         <span aria-hidden="true">{formatCurrency(animated)}</span>
       </p>
+
+      {allReceived && (
+        <div className="mt-3">
+          <CompleteMark>Tudo recebido</CompleteMark>
+        </div>
+      )}
 
       {totalCents > 0 && (
         <>
@@ -79,7 +95,7 @@ export function MonthHero({ rows, monthLabel }: MonthHeroProps) {
       )}
 
       {refundCents > 0 && (
-        <p className="mt-3 text-sm tabular-nums text-muted-foreground">
+        <p className="month-hero__refund mt-3 text-sm tabular-nums">
           Saldo a devolver: {formatCurrency(refundCents / 100)}
         </p>
       )}
