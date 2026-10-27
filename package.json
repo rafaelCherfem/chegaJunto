@@ -8,6 +8,7 @@
     "dev": "vite",
     "dev:local": "node scripts/dev-local.mjs",
     "supabase:start": "node scripts/supabase-start-local.mjs",
+    "seed:local": "node scripts/seed-local.mjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "lint": "eslint .",
