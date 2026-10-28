@@ -17,6 +17,20 @@ beforeEach(() => {
   state.rides = [];
   create.mockReset().mockImplementation(async ({ passengerId, rideDate }: { passengerId: string; rideDate: string }) => { state.rides = [...state.rides, { id: "R1", passengerId, rideDate, rateCharged: 12 }]; });
 });
+describe("cabeçalho da data na tela de diárias", () => {
+  it("mostra 'Hoje' sem empilhar o campo de data", () => {
+    const { container } = render(<RidesPage />);
+    expect(screen.getByText("Hoje")).toBeTruthy();
+    expect(container.querySelector(".ride-date-context--stacked")).toBeNull();
+  });
+  it("mostra a data completa e empilha o campo quando a data não é hoje", () => {
+    const { container } = render(<RidesPage />);
+    setDate(OTHER_DATE);
+    expect(screen.getByText("05/01/2026")).toBeTruthy();
+    expect(screen.queryByText("Hoje")).toBeNull();
+    expect(container.querySelector(".ride-date-context--stacked")).not.toBeNull();
+  });
+});
 describe("animação de registro na tela de diárias", () => {
   it("anima só o registro feito agora e limpa quando a animação termina", async () => {
     render(<RidesPage />);

@@ -868,6 +868,15 @@
       column-gap: 2rem;
     }
   }
+  /* Data longa (dd/mm/aaaa) não cabe ao lado do campo em telas estreitas: o campo desce. */
+  @media (max-width: 639px) {
+    .ride-date-context--stacked {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .ride-date-context--stacked .stat-value {
+      white-space: nowrap;
+    }
+  }
   .ride-register-row {
     @apply flex min-h-16 w-full items-center gap-3 rounded-2xl p-3 text-left transition-colors duration-150 motion-reduce:transition-none;
     border: 1px solid hsl(var(--border) / 0.8);

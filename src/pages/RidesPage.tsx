@@ -4,6 +4,7 @@ import { PassengerRideButton } from "@/components/rides/PassengerRideButton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { usePassengers } from "@/hooks/usePassengers";
+import { cn } from "@/lib/utils";
 import { useCreateRide, useDeleteRide, useRidesByMonth } from "@/hooks/useRides";
 import {
   assertRecordDate,
@@ -113,7 +114,12 @@ export function RidesPage() {
     <div className="page--rides mx-auto space-y-5 p-6">
       <header className="space-y-4">
         <h1 className="page-heading">Diárias</h1>
-        <div className="ride-date-context">
+        <div
+          className={cn(
+            "ride-date-context",
+            validDate && selectedDate !== today && "ride-date-context--stacked",
+          )}
+        >
           <div className="min-w-0 space-y-1">
             <p className="stat-label first-letter:uppercase">
               {formatMonthLabel(referenceMonth)}
