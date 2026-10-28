@@ -39,7 +39,8 @@ export default {
         sm: "calc(var(--radius) - 8px)",
       },
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
+        sans: ["Barlow", "system-ui", "sans-serif"],
+        display: ["Saira", "system-ui", "sans-serif"],
       },
     },
   },

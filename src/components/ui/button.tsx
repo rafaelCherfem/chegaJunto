@@ -4,12 +4,12 @@ import { forwardRef, type ButtonHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-[0.5rem] text-sm font-semibold leading-5 transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60",
+  "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-[0.5rem] text-sm font-semibold leading-5 transition-[color,background-color,border-color,box-shadow,transform] duration-150 motion-reduce:transition-none enabled:active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60",
   {
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground enabled:hover:bg-primary/90 enabled:active:bg-primary/80",
+          "bg-primary text-primary-foreground shadow-[0_10px_24px_-14px_hsl(var(--primary)/0.8)] enabled:hover:bg-primary/90 enabled:active:bg-primary/80",
         outline:
           "border border-border bg-transparent text-foreground enabled:hover:bg-muted enabled:active:bg-foreground/10",
         secondary:

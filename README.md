@@ -1,4 +1,4 @@
-# RideLedger
+# chegaJunto
 
 Controle de diárias de carona, sem caderno.
 

@@ -10,7 +10,8 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg", "apple-touch-icon.png"],
       workbox: {
-        globPatterns: ["**/*.{js,css,html,svg,png,ico}"],
+        globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2}"],
+        globIgnores: ["splash-*.png"],
         runtimeCaching: [
           {
             urlPattern: ({ request }) =>
@@ -25,8 +26,8 @@ export default defineConfig({
         ],
       },
       manifest: {
-        name: "RideLedger",
-        short_name: "RideLedger",
+        name: "chegaJunto",
+        short_name: "chegaJunto",
         description: "Controle de diárias de carona.",
         theme_color: "#131316",
         background_color: "#131316",

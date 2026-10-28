@@ -47,6 +47,12 @@ export function RidesPage() {
   const [rideError, setRideError] = useState<string | null>(null);
   const [registeringId, setRegisteringId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  // Só a linha que acabou de ser registrada anima; abrir a tela ou trocar de
+  // data mostra os registros já feitos sem movimento.
+  const [justRegistered, setJustRegistered] = useState<{
+    passengerId: string;
+    rideDate: string;
+  } | null>(null);
 
   const ridesOnSelectedDate = useMemo(
     () =>
@@ -78,6 +84,7 @@ export function RidesPage() {
         passengerId: passenger.id,
         rideDate: selectedDate,
       });
+      setJustRegistered({ passengerId: passenger.id, rideDate: selectedDate });
     } catch (error) {
       setRideError(
         error instanceof Error ? error.message : "Não foi possível registrar.",
@@ -108,13 +115,13 @@ export function RidesPage() {
         <h1 className="page-heading">Diárias</h1>
         <div className="ride-date-context">
           <div className="min-w-0 space-y-1">
-            <p className="text-sm font-medium text-muted-foreground">
+            <p className="stat-label first-letter:uppercase">
               {formatMonthLabel(referenceMonth)}
             </p>
             {validDate ? (
               <time
                 dateTime={selectedDate}
-                className="block text-xl font-semibold leading-7 tracking-tight tabular-nums sm:text-2xl sm:leading-8"
+                className="stat-value block text-[clamp(2rem,11vw,2.5rem)] leading-[1.05]"
               >
                 {selectedDate === today ? "Hoje" : formatDateDisplay(selectedDate)}
               </time>
@@ -136,7 +143,10 @@ export function RidesPage() {
               value={selectedDate}
               aria-invalid={Boolean(dateError)}
               aria-describedby={dateError ? "ride-error" : undefined}
-              onChange={(event) => setSelectedDate(event.target.value)}
+              onChange={(event) => {
+                setJustRegistered(null);
+                setSelectedDate(event.target.value);
+              }}
             />
           </div>
         </div>
@@ -206,6 +216,11 @@ export function RidesPage() {
                   passenger={passenger}
                   registered={ridesOnSelectedDate.has(passenger.id)}
                   registering={registeringId === passenger.id}
+                  justRegistered={
+                    justRegistered?.passengerId === passenger.id &&
+                    justRegistered.rideDate === selectedDate
+                  }
+                  onRegisteredAnimationEnd={() => setJustRegistered(null)}
                   monthRides={ridesByPassenger.get(passenger.id) ?? []}
                   deletingId={deletingId}
                   onRegister={handleRegister}

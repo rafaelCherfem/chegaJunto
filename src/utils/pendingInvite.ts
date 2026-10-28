@@ -1,4 +1,4 @@
-const key = "rideledger.pendingInvite";
+const key = "chegajunto.pendingInvite";
 const lifetime = 7 * 24 * 60 * 60 * 1000;
 export function rememberInvite(token: string): void {
   try {

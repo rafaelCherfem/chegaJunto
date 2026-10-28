@@ -74,7 +74,7 @@ export function PassengerPortalPage({ passengerId }: PassengerPortalPageProps) {
   return (
     <div className="min-h-svh">
       <header className="flex items-center justify-between px-6 pt-5 pb-4">
-        <span className="text-lg font-semibold tracking-tight">RideLedger</span>
+        <span className="text-lg font-semibold tracking-tight">chegaJunto</span>
         <Button
           variant="ghost"
           size="icon"

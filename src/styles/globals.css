@@ -2,6 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Fontes servidas pelo próprio app (licenças OFL em src/assets/fonts).
+   Saira: um recorte só, larga (wdth 125), itálica 800, para títulos e números.
+   Barlow: 400 cobre até 500 e 600 cobre do semibold para cima. */
+@font-face {
+  font-family: "Saira";
+  src: url("../assets/fonts/saira-wide-latin-800-italic.woff2") format("woff2");
+  font-weight: 500 900;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Barlow";
+  src: url("../assets/fonts/barlow-latin-400-normal.woff2") format("woff2");
+  font-weight: 100 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Barlow";
+  src: url("../assets/fonts/barlow-latin-600-normal.woff2") format("woff2");
+  font-weight: 600 900;
+  font-display: swap;
+}
+
 @layer base {
   :root {
     /* Dark-first: grafite estrutural, roxo de identidade, verde de confirmação. */
@@ -34,8 +57,17 @@
 
     --destructive: 4 70% 74%;
     --destructive-foreground: 240 8% 10%;
+    --shadow-color: 240 20% 2%;
+    /* Profundidade em camadas: fio de luz, contato, meio e ambiente. */
+    --elevation:
+      inset 0 1px 0 hsl(0 0% 100% / 0.05),
+      0 1px 1px hsl(var(--shadow-color) / 0.35),
+      0 4px 8px -2px hsl(var(--shadow-color) / 0.35),
+      0 16px 32px -12px hsl(var(--shadow-color) / 0.55),
+      0 32px 64px -24px hsl(var(--shadow-color) / 0.5);
 
     --radius: 0.625rem;
+    --speed-angle: 12deg;
     --page-gutter: 1rem;
     --content-width: 60rem;
   }
@@ -47,6 +79,18 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
     line-height: 1.5;
+    background-image: radial-gradient(
+      70rem 34rem at 50% -14rem,
+      hsl(var(--identity) / 0.09),
+      transparent 70%
+    );
+    background-repeat: no-repeat;
+    font-synthesis-weight: none;
+  }
+
+  h2 {
+    font-family: theme("fontFamily.display");
+    font-style: italic;
   }
 
   :focus-visible {
@@ -62,23 +106,96 @@
 }
 
 @layer components {
-  .rideledger-brand {
+  .brand-logo {
     display: inline-flex;
     align-items: center;
     gap: 0.625rem;
     white-space: nowrap;
+    @apply text-lg;
   }
-  .rideledger-brand__mark {
+  .brand-logo__mark {
     width: 1.75rem;
     height: 1.75rem;
     flex-shrink: 0;
-    color: hsl(var(--identity));
   }
-  .wordmark .rideledger-brand__name {
+  .brand-logo__wordmark {
+    height: 0.82em;
+    width: auto;
+    flex-shrink: 0;
     color: hsl(var(--foreground));
   }
-  .wordmark .rideledger-brand__name > span {
+  .brand-logo__accent {
     color: hsl(var(--identity));
+  }
+  .brand-logo--hero {
+    font-size: min(8vw, 2.75rem);
+    gap: 0.4em;
+  }
+  .brand-logo--hero .brand-logo__mark {
+    width: 1.3em;
+    height: 1.3em;
+  }
+  .brand-logo--hero .brand-logo__wordmark {
+    filter: drop-shadow(0 0.12em 0.3em hsl(var(--shadow-color) / 0.7));
+  }
+  /* Fundo do login: brilho no fim da estrada, luz atrás do painel e vinheta. */
+  .login-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+    user-select: none;
+    color: hsl(var(--identity));
+    color: hsl(from hsl(var(--identity)) h calc(s + 20) calc(l - 10));
+    background:
+      radial-gradient(
+        36rem 28rem at 50% 72%,
+        hsl(var(--identity) / 0.07),
+        transparent 70%
+      ),
+      hsl(var(--background));
+  }
+  .login-backdrop::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      125% 95% at 50% 45%,
+      transparent 45%,
+      hsl(var(--shadow-color) / 0.55) 80%,
+      hsl(var(--shadow-color) / 0.9) 100%
+    );
+  }
+  .login-backdrop svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+  .login-backdrop__landscape {
+    display: none;
+  }
+  .login-backdrop__road {
+    fill: currentColor;
+    fill-opacity: 0.06;
+  }
+  .login-backdrop__edge {
+    fill: currentColor;
+    fill-opacity: 0.34;
+  }
+  .login-backdrop__dash {
+    fill: currentColor;
+    fill-opacity: 0.72;
+  }
+  .login-backdrop__glow-core {
+    stop-color: hsl(var(--identity) / 0.34);
+  }
+  .login-backdrop__glow-mid {
+    stop-color: hsl(var(--identity) / 0.12);
+  }
+  .login-backdrop__glow-out {
+    stop-color: hsl(var(--identity) / 0);
   }
   .app-shell,
   .login-layout {
@@ -163,6 +280,63 @@
     border-bottom: 1px solid hsl(var(--border));
     padding-bottom: 1rem;
   }
+  .day-card {
+    display: flex;
+    align-items: center;
+    gap: 1.125rem;
+    max-width: 30rem;
+    padding: 1.125rem;
+    border: 1px solid hsl(var(--border) / 0.8);
+    border-radius: 1.25rem;
+    background:
+      linear-gradient(170deg, hsl(var(--identity) / 0.09), transparent 62%),
+      hsl(var(--card));
+    box-shadow: var(--elevation);
+  }
+  .day-ring {
+    position: relative;
+    width: 4.125rem;
+    height: 4.125rem;
+    flex-shrink: 0;
+  }
+  .day-ring > svg {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+  }
+  .day-ring__track {
+    fill: none;
+    stroke: hsl(var(--muted));
+    stroke-width: 7;
+  }
+  .day-ring__value {
+    fill: none;
+    stroke: hsl(var(--confirmation));
+    stroke-width: 7;
+    stroke-linecap: round;
+    transition: stroke-dasharray 420ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .day-ring__label {
+    @apply absolute inset-0 flex items-center justify-center text-base font-extrabold italic tabular-nums;
+    font-family: theme("fontFamily.display");
+  }
+  .day-ring--complete > svg {
+    filter: drop-shadow(0 0 6px hsl(var(--confirmation) / 0.45));
+  }
+  .day-ring__check {
+    color: hsl(var(--confirmation));
+  }
+
+  /* Estado de "tudo feito", compartilhado entre Diárias e Cobranças. */
+  .complete-mark {
+    @apply inline-flex items-center gap-1.5 text-sm font-semibold leading-snug;
+    color: hsl(var(--confirmation));
+  }
+  .complete-mark__icon {
+    @apply inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full;
+    background: hsl(var(--confirmation-background));
+    box-shadow: inset 0 0 0 1px hsl(var(--confirmation) / 0.22);
+  }
   .context-summary > p {
     flex-shrink: 0;
   }
@@ -173,18 +347,6 @@
   .context-summary--billing > p {
     flex: 1 1 14rem;
     min-width: 0;
-  }
-  .daily-progress {
-    height: 3px;
-    width: 6rem;
-    border-radius: 2px;
-    overflow: hidden;
-    background: hsl(var(--muted));
-  }
-  .daily-progress > span {
-    display: block;
-    height: 100%;
-    background: hsl(var(--confirmation));
   }
   @media (min-width: 375px) {
     .route-decoration__top {
@@ -216,26 +378,28 @@
       bottom: -160px;
       left: -130px;
     }
-    .login-layout .route-decoration {
-      bottom: 0;
+    .login-backdrop__portrait {
+      display: none;
+    }
+    .login-backdrop__landscape {
+      display: block;
     }
   }
   .surface {
-    @apply rounded-lg bg-card text-card-foreground;
+    @apply bg-card text-card-foreground;
+    border: 1px solid hsl(var(--border) / 0.7);
+    border-radius: 1rem;
+    background-image: linear-gradient(
+      180deg,
+      hsl(0 0% 100% / 0.04),
+      transparent 55%
+    );
+    box-shadow: var(--elevation);
   }
 
   /* Divisores antigos continuam visíveis sem reconstruir suas telas. */
   .surface .border-black\/10 {
     border-color: hsl(var(--border));
-  }
-
-  .wordmark {
-    @apply text-lg font-semibold tracking-tight;
-    color: hsl(var(--foreground));
-  }
-
-  .wordmark span {
-    color: hsl(var(--identity));
   }
 
   .app-shell__header,
@@ -285,9 +449,11 @@
     content: "";
     position: absolute;
     top: 0;
-    width: 1.5rem;
-    height: 2px;
+    width: 1.75rem;
+    height: 3px;
+    border-radius: 0 0 3px 3px;
     background: currentColor;
+    box-shadow: 0 0 14px 1px hsl(var(--identity) / 0.55);
   }
 
   .app-shell__nav-label {
@@ -311,7 +477,41 @@
   }
 
   .page-heading {
-    @apply text-2xl font-semibold leading-tight tracking-tight;
+    @apply text-[1.75rem] font-extrabold italic leading-tight tracking-[-0.035em] sm:text-3xl;
+    font-family: theme("fontFamily.display");
+  }
+
+  /* Números de destaque: Saira larga itálica. Rótulos: pequenos e espaçados. */
+  .stat-value {
+    @apply font-extrabold italic tracking-[-0.02em] tabular-nums;
+    font-family: theme("fontFamily.display");
+  }
+  /* O número principal da tela ganha um brilho suave de identidade. */
+  .month-hero .stat-value,
+  .ride-date-context .stat-value {
+    text-shadow:
+      0 0 1px hsl(var(--foreground) / 0.35),
+      0 0 18px hsl(var(--identity) / 0.42),
+      0 0 44px hsl(var(--identity) / 0.22);
+  }
+  .stat-label {
+    @apply text-[0.6875rem] font-semibold uppercase tracking-[0.2em];
+    color: hsl(var(--identity));
+  }
+
+  .avatar {
+    @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[0.8125rem] font-extrabold italic uppercase;
+    font-family: theme("fontFamily.display");
+    background: hsl(var(--muted));
+    color: hsl(var(--text-secondary));
+  }
+  .avatar--done {
+    background: hsl(var(--confirmation) / 0.16);
+    color: hsl(var(--confirmation));
+  }
+  .avatar--due {
+    background: hsl(var(--attention) / 0.14);
+    color: hsl(var(--attention));
   }
   .passenger-row {
     @apply flex flex-wrap items-center justify-between gap-x-4 gap-y-2;
@@ -343,16 +543,113 @@
   .financial-list {
     @apply grid grid-cols-1 gap-3 xl:grid-cols-2;
   }
+
+  .month-hero {
+    padding: 1.25rem;
+    border: 1px solid hsl(var(--border) / 0.9);
+    border-radius: 1.375rem;
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    background:
+      linear-gradient(165deg, hsl(var(--identity) / 0.13), transparent 58%),
+      hsl(var(--card));
+    box-shadow: var(--elevation);
+  }
+  /* Linhas finas de velocidade, atrás do conteúdo, sumindo para a esquerda. */
+  .month-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      linear-gradient(90deg, transparent, hsl(var(--identity) / 0.55), transparent) 100% 18% / 52% 1px no-repeat,
+      linear-gradient(90deg, transparent, hsl(var(--identity) / 0.3), transparent) 100% 27% / 78% 1px no-repeat,
+      linear-gradient(90deg, transparent, hsl(var(--confirmation) / 0.4), transparent) 100% 36% / 38% 1px no-repeat,
+      linear-gradient(90deg, transparent, hsl(var(--identity) / 0.22), transparent) 100% 45% / 66% 1px no-repeat,
+      linear-gradient(90deg, transparent, hsl(var(--identity) / 0.45), transparent) 100% 54% / 28% 2px no-repeat;
+    -webkit-mask-image: linear-gradient(90deg, transparent 8%, #000 70%);
+    mask-image: linear-gradient(90deg, transparent 8%, #000 70%);
+  }
+  .month-hero .context-summary {
+    margin-top: 1rem;
+    padding-top: 0.875rem;
+    padding-bottom: 0;
+    border-bottom: 0;
+    border-top: 1px solid hsl(var(--border) / 0.7);
+  }
+  .month-hero__bar {
+    display: flex;
+    height: 0.4375rem;
+    margin-top: 1.125rem;
+    border-radius: 0.3125rem;
+    overflow: hidden;
+    background: hsl(var(--attention));
+  }
+  .month-hero__bar-paid {
+    display: block;
+    height: 100%;
+    border-right: 3px solid hsl(var(--card));
+    background: hsl(var(--confirmation));
+    transition: width 420ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .month-hero__legend {
+    @apply mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-sm;
+    color: hsl(var(--text-secondary));
+  }
+  .month-hero__legend > span {
+    @apply inline-flex items-center gap-2;
+  }
+  .month-hero__legend strong {
+    @apply font-bold;
+    color: hsl(var(--foreground));
+  }
+  .month-hero__refund {
+    color: hsl(var(--destructive));
+  }
+  .month-hero__dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+  }
+  .month-hero__dot--paid {
+    background: hsl(var(--confirmation));
+  }
+  .month-hero__dot--pending {
+    background: hsl(var(--attention));
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .month-hero__bar-paid,
+    .day-ring__value {
+      transition: none;
+    }
+  }
   .charge-status {
-    @apply inline-flex min-h-6 items-center gap-1 rounded px-2 py-1 text-xs font-semibold leading-none;
+    @apply inline-flex min-h-6 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold leading-none;
   }
   .charge-status--paid {
     background: hsl(var(--confirmation-background));
     color: hsl(var(--confirmation));
+    box-shadow: inset 0 0 0 1px hsl(var(--confirmation) / 0.22);
+  }
+  .charge-status--refund {
+    background: hsl(var(--destructive) / 0.1);
+    color: hsl(var(--destructive));
+    box-shadow: inset 0 0 0 1px hsl(var(--destructive) / 0.25);
   }
   .charge-status--pending {
     background: hsl(var(--attention) / 0.1);
     color: hsl(var(--attention));
+    box-shadow: inset 0 0 0 1px hsl(var(--attention) / 0.25);
+  }
+  .charge-status--pending::before {
+    content: "";
+    width: 0.375rem;
+    height: 0.375rem;
+    border-radius: 9999px;
+    background: currentColor;
   }
   .charge-status--neutral {
     @apply bg-muted text-muted-foreground;
@@ -364,12 +661,188 @@
     @apply w-full max-w-full justify-start whitespace-normal text-left sm:w-auto;
   }
 
-  .ride-list {
-    background: hsl(var(--list-background));
+  /* Card tocável: a área de resumo abre o sheet; a ação principal fica fora dela. */
+  .charge-card__summary {
+    @apply relative block w-full min-w-0 rounded-lg text-left;
+    background: none;
+    border: 0;
+    padding: 0;
+    color: inherit;
+    cursor: pointer;
+  }
+  .charge-card__chevron {
+    @apply absolute bottom-1 right-0 h-5 w-5;
+    color: hsl(var(--text-subtle));
   }
 
-  .ride-list > li + li {
-    border-top: 1px solid hsl(var(--border) / 0.65);
+  /* Bottom sheet no celular, painel lateral em lg. */
+  .sheet__overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: hsl(var(--shadow-color) / 0.64);
+    backdrop-filter: blur(2px);
+  }
+  .sheet {
+    position: fixed;
+    z-index: 50;
+    inset: auto 0 0 0;
+    max-height: 85svh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0 1.25rem calc(1.25rem + env(safe-area-inset-bottom));
+    border: 1px solid hsl(var(--border) / 0.9);
+    border-bottom: 0;
+    border-radius: 1.375rem 1.375rem 0 0;
+    isolation: isolate;
+    background:
+      linear-gradient(165deg, hsl(var(--identity) / 0.13), transparent 40%),
+      hsl(var(--card));
+    box-shadow: var(--elevation);
+  }
+  .sheet__grip {
+    @apply flex justify-center py-3;
+    touch-action: none;
+    cursor: grab;
+  }
+  .sheet__handle {
+    width: 2.5rem;
+    height: 0.25rem;
+    border-radius: 9999px;
+    background: hsl(var(--text-subtle) / 0.55);
+  }
+  .sheet__close {
+    @apply absolute right-3 top-3 inline-flex h-11 w-11 items-center justify-center rounded-lg;
+    color: hsl(var(--text-secondary));
+  }
+  .sheet__close:hover {
+    background: hsl(var(--muted));
+  }
+  /* Linhas de velocidade inclinadas em --speed-angle, atrás do cabeçalho. */
+  .sheet__header {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    margin: 0 -1.25rem;
+    padding: 0.25rem 1.25rem 0.5rem;
+  }
+  .sheet__header::before {
+    content: "";
+    position: absolute;
+    inset: -40% -10%;
+    z-index: -1;
+    pointer-events: none;
+    transform: rotate(calc(var(--speed-angle) * -1));
+    background:
+      linear-gradient(90deg, transparent, hsl(var(--identity) / 0.5), transparent) 100% 38% / 56% 1px no-repeat,
+      linear-gradient(90deg, transparent, hsl(var(--identity) / 0.28), transparent) 100% 48% / 78% 1px no-repeat,
+      linear-gradient(90deg, transparent, hsl(var(--confirmation) / 0.35), transparent) 100% 58% / 40% 1px no-repeat,
+      linear-gradient(90deg, transparent, hsl(var(--identity) / 0.4), transparent) 100% 68% / 30% 2px no-repeat;
+    -webkit-mask-image: linear-gradient(90deg, transparent 8%, #000 70%);
+    mask-image: linear-gradient(90deg, transparent 8%, #000 70%);
+  }
+  .sheet__details {
+    @apply grid gap-2 border-t border-border/60 pt-3 text-sm;
+  }
+  .sheet__details > div {
+    @apply flex items-baseline justify-between gap-4;
+  }
+  .sheet__details dt {
+    color: hsl(var(--text-secondary));
+  }
+  .sheet__details dd {
+    @apply font-semibold tabular-nums;
+  }
+  .sheet__actions {
+    @apply mt-5 grid gap-2;
+  }
+  .sheet__actions > button {
+    @apply w-full whitespace-normal;
+  }
+  /* Ação secundária: sem borda nem fundo, separada das principais. */
+  .sheet__undo {
+    @apply mt-3 border-t border-border/60 pt-3;
+  }
+  .sheet__undo > button {
+    @apply w-full whitespace-normal font-medium;
+    color: hsl(var(--text-secondary));
+  }
+
+  @keyframes sheet-fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes sheet-fade-out {
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes sheet-in-bottom {
+    from {
+      transform: translateY(100%);
+    }
+  }
+  @keyframes sheet-out-bottom {
+    to {
+      transform: translateY(100%);
+    }
+  }
+  @keyframes sheet-in-right {
+    from {
+      transform: translateX(100%);
+    }
+  }
+  @keyframes sheet-out-right {
+    to {
+      transform: translateX(100%);
+    }
+  }
+  .sheet__overlay[data-state="open"] {
+    animation: sheet-fade-in 200ms ease-out;
+  }
+  .sheet__overlay[data-state="closed"] {
+    animation: sheet-fade-out 160ms ease-in forwards;
+  }
+  .sheet[data-state="open"] {
+    animation: sheet-in-bottom 280ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .sheet[data-state="closed"] {
+    animation: sheet-out-bottom 200ms ease-in forwards;
+  }
+
+  @media (min-width: 1024px) {
+    .sheet {
+      inset: 0 0 0 auto;
+      width: 26rem;
+      max-height: none;
+      padding-top: 1.25rem;
+      border: 1px solid hsl(var(--border) / 0.9);
+      border-right: 0;
+      border-radius: 1.375rem 0 0 1.375rem;
+    }
+    .sheet__grip {
+      display: none;
+    }
+    .sheet[data-state="open"] {
+      animation-name: sheet-in-right;
+    }
+    .sheet[data-state="closed"] {
+      animation-name: sheet-out-right;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sheet,
+    .sheet__overlay {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+
+  .ride-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
   }
 
   .ride-date-context {
@@ -396,12 +869,68 @@
     }
   }
   .ride-register-row {
-    @apply grid min-h-16 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 rounded-lg py-1 text-left enabled:hover:bg-muted/50 enabled:active:bg-muted;
+    @apply flex min-h-16 w-full items-center gap-3 rounded-2xl p-3 text-left transition-colors duration-150 motion-reduce:transition-none;
+    border: 1px solid hsl(var(--border) / 0.8);
+    background: hsl(var(--card));
+    box-shadow: var(--elevation);
+  }
+  .ride-register-row:enabled:hover {
+    border-color: hsl(var(--identity) / 0.45);
+  }
+  .ride-register-row:enabled:active {
+    background: hsl(var(--muted));
+  }
+  .ride-register-row:disabled {
+    cursor: default;
+    opacity: 1;
+  }
+  /* Só o registro confirmado fica verde; enquanto o servidor responde, não. */
+  .ride-register-row[data-state="registered"] {
+    border-color: hsl(var(--confirmation) / 0.26);
+    background: hsl(var(--confirmation) / 0.07);
+  }
+  .ride-register-row[data-state="registering"] {
+    cursor: progress;
+  }
+  .ride-register-row[data-state="registering"] .ride-register-action {
+    opacity: 0.8;
+    box-shadow: none;
   }
 
   .ride-register-action {
-    @apply inline-flex min-h-11 items-center justify-end gap-1.5 text-sm font-semibold;
+    @apply inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold;
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    box-shadow: 0 8px 20px -10px hsl(var(--primary) / 0.9);
+  }
+  .ride-register-action--done {
+    background: transparent;
     color: hsl(var(--confirmation));
+    box-shadow: none;
+    padding-inline: 0.25rem;
+  }
+
+  @keyframes ride-check-in {
+    from {
+      transform: scale(0.4);
+      opacity: 0;
+    }
+    to {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+  .ride-check-in {
+    animation: ride-check-in 320ms cubic-bezier(0.34, 1.4, 0.64, 1);
+  }
+  /* Mesma duração do check: o fim de qualquer um encerra a confirmação. */
+  @keyframes avatar-pop {
+    50% {
+      transform: scale(1.14);
+    }
+  }
+  .avatar--pop {
+    animation: avatar-pop 320ms cubic-bezier(0.34, 1.4, 0.64, 1);
   }
 
   .ride-history {
@@ -430,8 +959,27 @@
     padding-bottom: calc(2.5rem + env(safe-area-inset-bottom, 0px));
   }
 
+  /* Painel do login: o próprio formulário, com respiro interno. */
   .login-form {
-    @apply w-full max-w-sm;
+    @apply w-full max-w-sm p-6 sm:p-7;
+    border: 1px solid hsl(var(--border) / 0.7);
+    border-radius: 1.25rem;
+    background:
+      linear-gradient(180deg, hsl(0 0% 100% / 0.04), transparent 55%),
+      hsl(var(--card));
+    box-shadow: var(--elevation);
+  }
+  .login-form h1,
+  .login-tagline {
+    font-family: theme("fontFamily.display");
+    font-style: italic;
+    font-weight: 800;
+  }
+  .login-form h1 {
+    letter-spacing: -0.035em;
+  }
+  .login-tagline {
+    letter-spacing: -0.02em;
   }
 
   @media (min-width: 1024px) {
@@ -478,7 +1026,7 @@
       padding-inline: 3rem;
     }
     .login-form {
-      padding-block: 2rem;
+      padding: 2rem;
       justify-self: end;
     }
   }

@@ -26,7 +26,7 @@ describe("resumos de apresentação", () => {
     expect(screen.getByText(/carona registrada hoje/)).toBeTruthy();
   });
   it("identifica uma data selecionada que não é hoje", () => {
-    render(
+    const { container } = render(
       <DailySummary
         passengers={[passenger("A")]}
         registeredIds={new Set()}
@@ -35,6 +35,7 @@ describe("resumos de apresentação", () => {
     );
     expect(screen.getByText("0 de 1")).toBeTruthy();
     expect(screen.getByText(/caronas registradas nesta data/)).toBeTruthy();
+    expect(container.querySelector(".day-ring")).not.toBeNull();
   });
   it("não mostra progresso nem divisão por zero sem passageiros ativos", () => {
     const { container } = render(
@@ -45,7 +46,34 @@ describe("resumos de apresentação", () => {
       />,
     );
     expect(screen.getByText("0 de 0")).toBeTruthy();
-    expect(container.querySelector(".daily-progress")).toBeNull();
+    expect(container.querySelector(".day-ring")).toBeNull();
+    expect(container.querySelector(".complete-mark")).toBeNull();
+  });
+  it("dia completo troca a contagem do anel pelo check e mostra o selo de concluído", () => {
+    const { container } = render(
+      <DailySummary
+        passengers={[passenger("A"), passenger("B"), passenger("C", false)]}
+        registeredIds={new Set(["A", "B"])}
+        isToday
+      />,
+    );
+    expect(screen.getByText("2 de 2")).toBeTruthy();
+    expect(container.querySelector(".day-ring--complete .day-ring__check")).not.toBeNull();
+    expect(container.querySelector(".day-ring__label")?.textContent).toBe("");
+    expect(screen.getByText("Tudo registrado hoje").className).toBe("complete-mark");
+    expect(screen.queryByText(/falta/)).toBeNull();
+  });
+  it("dia incompleto mantém a contagem e não mostra o selo", () => {
+    const { container } = render(
+      <DailySummary
+        passengers={[passenger("A"), passenger("B")]}
+        registeredIds={new Set(["A"])}
+        isToday={false}
+      />,
+    );
+    expect(container.querySelector(".day-ring--complete, .complete-mark")).toBeNull();
+    expect(container.querySelector(".day-ring__label")?.textContent).toBe("1/2");
+    expect(screen.getByText(/falta 1 passageiro/)).toBeTruthy();
   });
   it("distingue obrigação, saldo zero, prévia e fechamento desatualizado", () => {
     render(
