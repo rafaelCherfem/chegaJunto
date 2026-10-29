@@ -47,7 +47,7 @@ export function MonthlyChargeCard(props: MonthlyChargeCardProps) {
       <div className="flex items-start gap-3">
         <span
           aria-hidden="true"
-          className={settled ? "avatar avatar--done" : "avatar avatar--due"}
+          className={settled && refundCents === 0 ? "avatar avatar--done" : "avatar avatar--due"}
         >
           {initials(props.passengerName)}
         </span>

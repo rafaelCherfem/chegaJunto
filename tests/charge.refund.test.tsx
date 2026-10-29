@@ -10,6 +10,8 @@ type Case = { amount: number; paidAmount: number; paid: boolean };
 const pendingRefund: Case = { amount: -15, paidAmount: 0, paid: false };
 const doneRefund: Case = { amount: -15, paidAmount: -15, paid: true };
 const partialRefund: Case = { amount: -15, paidAmount: -5, paid: false };
+// Total R$ 5,00, pago R$ 20,00: saldo a devolver de R$ 15,00.
+const overpaid: Case = { amount: 5, paidAmount: 20, paid: true };
 
 function props(c: Case) {
   return {
@@ -111,9 +113,48 @@ describe("MonthHero concorda com o card", () => {
     expect(screen.queryByText("Tudo recebido")).toBeNull();
   });
 
-  it("total positivo pago a mais segue como saldo a devolver e permite Tudo recebido", () => {
-    render(<MonthHero monthLabel="julho" rows={[closed({ amount: 204, paidAmount: 254, paid: true })]} />);
-    expect(screen.getByText(/Saldo a devolver: R\$\s50,00/)).toBeTruthy();
+  it("total positivo pago a mais: saldo a devolver, pendente e sem Tudo recebido", () => {
+    render(<MonthHero monthLabel="julho" rows={[closed(overpaid)]} />);
+    expect(screen.getByText(/Saldo a devolver: R\$\s15,00/)).toBeTruthy();
+    expect(screen.queryByText("Tudo recebido")).toBeNull();
+    expect(screen.getByText(/1 pendente\b/)).toBeTruthy();
+    expect(screen.getByText(/0 pagas/)).toBeTruthy();
+  });
+
+  it("sem saldo a devolver (pago exato) tudo volta ao normal", () => {
+    render(<MonthHero monthLabel="julho" rows={[closed({ amount: 5, paidAmount: 5, paid: true })]} />);
     expect(screen.getByText("Tudo recebido")).toBeTruthy();
+    expect(screen.queryByText(/Saldo a devolver/)).toBeNull();
+    expect(screen.getByText(/0 pendentes/)).toBeTruthy();
+    expect(screen.getByText(/1 paga\b/)).toBeTruthy();
+  });
+});
+
+describe("cobrança paga a mais (total positivo, pago maior)", () => {
+  it("card: chip A devolver e texto de pago a mais, sem Pagamento recebido", () => {
+    const { container } = render(<MonthlyChargeCard {...props(overpaid)} />);
+    expect(screen.getByText("A devolver")).toBeTruthy();
+    expect(screen.getByText(/Pago a mais · devolva R\$\s15,00/)).toBeTruthy();
+    expect(screen.queryByText("Pagamento recebido")).toBeNull();
+    expect(screen.queryByText("Pago")).toBeNull();
+    expect(container.querySelector(".avatar--due")).not.toBeNull();
+  });
+
+  it("sheet: chip A devolver, saldo a devolver e texto de pago a mais", () => {
+    render(<ChargeSheet {...props(overpaid)} monthLabel="outubro de 2026" open onOpenChange={vi.fn()} />);
+    expect(screen.getByText("A devolver")).toBeTruthy();
+    expect(screen.getByText(/Pago a mais · devolva R\$\s15,00/)).toBeTruthy();
+    expect(screen.getByText("Saldo a devolver")).toBeTruthy();
+    expect(screen.queryByText("Pagamento recebido")).toBeNull();
+  });
+
+  it("pago exato: volta a Pago e Pagamento recebido", () => {
+    const { container } = render(
+      <MonthlyChargeCard {...props({ amount: 5, paidAmount: 5, paid: true })} />,
+    );
+    expect(screen.getByText("Pago")).toBeTruthy();
+    expect(screen.getByText("Pagamento recebido")).toBeTruthy();
+    expect(screen.queryByText("A devolver")).toBeNull();
+    expect(container.querySelector(".avatar--done")).not.toBeNull();
   });
 });

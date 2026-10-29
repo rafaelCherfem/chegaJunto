@@ -52,6 +52,8 @@ export function chargeState(input: ChargeStateInput) {
     refundCents,
     returnedCents: isRefund && paidCents < 0 ? -paidCents : 0,
     hasObligation,
+    // Algo ainda a resolver: valor a receber ou devolução em aberto (inclusive pago a mais).
+    open: hasObligation && (!settled || refundCents > 0),
   };
 }
 
@@ -59,7 +61,7 @@ export type ChargeState = ReturnType<typeof chargeState>;
 
 // Textos que dependem da direção do dinheiro: pagar (passageiro deve) ou devolver.
 export function chargeTexts(state: ChargeState) {
-  const { isRefund, partial, outstandingCents, refundCents } = state;
+  const { isRefund, partial, outstandingCents, refundCents, refundStatus } = state;
   return {
     payLabel: isRefund
       ? partial
@@ -69,6 +71,10 @@ export function chargeTexts(state: ChargeState) {
         ? `Pagar ${formatCurrency(outstandingCents / 100)}`
         : "Marcar como pago",
     unmarkLabel: isRefund ? "Desmarcar devolução" : "Desmarcar pagamento",
-    settledText: isRefund ? "Devolução feita" : "Pagamento recebido",
+    settledText: isRefund
+      ? "Devolução feita"
+      : refundStatus === "overpaid"
+        ? `Pago a mais · devolva ${formatCurrency(refundCents / 100)}`
+        : "Pagamento recebido",
   };
 }

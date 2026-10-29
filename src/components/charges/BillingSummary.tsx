@@ -12,8 +12,8 @@ export function BillingSummary({ rows }: { rows: BillingRow[] }) {
     .filter((row) => row.status === "closed")
     .map(chargeState)
     .filter((state) => state.hasObligation);
-  const pending = obligations.filter((state) => !state.settled).length;
-  const paid = obligations.filter((state) => state.settled).length;
+  const pending = obligations.filter((state) => state.open).length;
+  const paid = obligations.length - pending;
   const previews = rows.filter((row) => row.status === "preview").length;
   const outdated = rows.filter((row) => row.status === "outdated").length;
   return (

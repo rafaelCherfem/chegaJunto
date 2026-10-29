@@ -15,10 +15,18 @@ describe("MonthHero: Tudo recebido", () => {
     expect(screen.getByText("Tudo recebido")).toBeTruthy();
   });
 
-  it("aparece com saldo a devolver e mantém a linha do saldo", () => {
+  it("não aparece enquanto houver saldo a devolver em aberto, e a linha do saldo fica visível", () => {
     render(<MonthHero monthLabel="julho" rows={[closed(100, 100, true), closed(204, 254, true)]} />);
-    expect(screen.getByText("Tudo recebido")).toBeTruthy();
+    expect(screen.queryByText("Tudo recebido")).toBeNull();
     expect(screen.getByText(/Saldo a devolver: R\$\s50,00/)).toBeTruthy();
+    expect(screen.getByText(/1 pendente\b/)).toBeTruthy();
+  });
+
+  it("volta a aparecer quando o saldo a devolver é zerado", () => {
+    render(<MonthHero monthLabel="julho" rows={[closed(100, 100, true), closed(254, 254, true)]} />);
+    expect(screen.getByText("Tudo recebido")).toBeTruthy();
+    expect(screen.queryByText(/Saldo a devolver/)).toBeNull();
+    expect(screen.getByText(/0 pendentes/)).toBeTruthy();
   });
 
   it("não aparece com pendência ou pagamento parcial", () => {

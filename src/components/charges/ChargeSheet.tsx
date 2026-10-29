@@ -53,7 +53,9 @@ export function ChargeSheet({ monthLabel, open, onOpenChange, ...props }: Charge
             <p className="mt-1 text-sm text-muted-foreground">
               {settled && hasObligation ? (
                 <span className="inline-flex items-center gap-1.5">
-                  <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                  {refundStatus !== "overpaid" && (
+                    <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                  )}
                   {texts.settledText}
                 </span>
               ) : (

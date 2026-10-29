@@ -88,6 +88,21 @@ describe("chargeState", () => {
       expect(s).toMatchObject({ settled: false, partial: false, refundCents: 0 });
     }
   });
+  it("open: pago a mais e devolução em aberto ficam pendentes; pago exato e devolvido não", () => {
+    const open = (input: Parameters<typeof chargeState>[0]) => chargeState(input).open;
+    expect(open({ ...base, amount: 5, paidAmount: 20, paid: true })).toBe(true);
+    expect(open({ ...base, amount: -15, paid: false })).toBe(true);
+    expect(open({ ...base, amount: 30, paidAmount: 10, paid: false })).toBe(true);
+    expect(open({ ...base, amount: 5, paidAmount: 5, paid: true })).toBe(false);
+    expect(open({ ...base, amount: -15, paidAmount: -15, paid: true })).toBe(false);
+    expect(open({ ...base, amount: 0, paid: true })).toBe(false);
+  });
+
+  it("pago a mais: texto curto com o valor a devolver", () => {
+    const text = chargeTexts(chargeState({ ...base, amount: 5, paidAmount: 20, paid: true }));
+    expect(text.settledText).toMatch(/^Pago a mais · devolva R\$\s15,00$/);
+  });
+
   it("prévia nunca vira estado de devolução", () => {
     const refund = chargeState({ status: "preview", amount: -20, paid: false });
     expect(refund).toMatchObject({ refundStatus: null, refundCents: 0 });
