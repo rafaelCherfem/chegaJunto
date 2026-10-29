@@ -13,7 +13,8 @@ describe("integer financial domain", () => {
   it("direction changes by signed cents", () => { expect(debtLabel(100)).toContain("Passageiro deve"); expect(debtLabel(-100)).toContain("Você deve"); expect(debtLabel(0)).toBe("Nenhum valor pendente"); });
 });
 describe("integral payment card", () => {
-  it.each([10, -10])("pending %s can be paid in either direction", (amount) => { render(<MonthlyChargeCard {...props} amount={amount} />); fireEvent.click(screen.getByText("Marcar como pago")); expect(props.onMarkPaid).toHaveBeenCalled(); expect(screen.getByText(amount > 0 ? /Passageiro deve/ : /Você deve/)).toBeTruthy(); });
+  it("pending 10 is paid by the passenger", () => { render(<MonthlyChargeCard {...props} amount={10} />); fireEvent.click(screen.getByText("Marcar como pago")); expect(props.onMarkPaid).toHaveBeenCalled(); expect(screen.getByText(/Passageiro deve/)).toBeTruthy(); });
+  it("pending -10 is a refund owed to the passenger, never a payment", () => { render(<MonthlyChargeCard {...props} amount={-10} />); fireEvent.click(screen.getByText("Marcar como devolvido")); expect(props.onMarkPaid).toHaveBeenCalled(); expect(screen.getByText(/Você deve/)).toBeTruthy(); expect(screen.getByText("A devolver")).toBeTruthy(); expect(screen.queryByText("Marcar como pago")).toBeNull(); });
   it("zero never shows a payment or cancel button", () => { render(<MonthlyChargeCard {...props} amount={0} paid />); expect(screen.getByText("Nenhum valor pendente")).toBeTruthy(); expect(screen.queryByText("Marcar como pago")).toBeNull(); expect(screen.queryByText("Desmarcar pagamento")).toBeNull(); });
   it("paid card drops the debt line and moves unmark out of the card", () => { render(<MonthlyChargeCard {...props} paid canUnmarkPaid />); expect(screen.getByText("Pago")).toBeTruthy(); expect(screen.getByText("Pagamento recebido")).toBeTruthy(); expect(screen.queryByText(/Passageiro deve/)).toBeNull(); expect(screen.queryByText("Desmarcar pagamento")).toBeNull(); expect(screen.queryByText("Marcar como pago")).toBeNull(); });
   it("tapping the summary opens the details", () => { const onOpenDetails = vi.fn(); render(<MonthlyChargeCard {...props} onOpenDetails={onOpenDetails} />); fireEvent.click(screen.getByText(props.passengerName)); expect(onOpenDetails).toHaveBeenCalled(); });
@@ -23,7 +24,7 @@ describe("integral payment card", () => {
   it("same total stays paid; change reopens pending; zero has no obligation", () => {
     const view = render(<MonthlyChargeCard {...props} paid />);
     view.rerender(<MonthlyChargeCard {...props} paid />); expect(screen.getByText("Pago")).toBeTruthy();
-    view.rerender(<MonthlyChargeCard {...props} amount={-20} paid={false} />); expect(screen.getByText("Pendente")).toBeTruthy(); expect(screen.getByText(/Você deve/)).toBeTruthy();
+    view.rerender(<MonthlyChargeCard {...props} amount={-20} paid={false} />); expect(screen.getByText("A devolver")).toBeTruthy(); expect(screen.getByText(/Você deve/)).toBeTruthy();
     view.rerender(<MonthlyChargeCard {...props} amount={0} paid />); expect(screen.queryByText("Pago")).toBeNull(); expect(screen.queryByText("Marcar como pago")).toBeNull();
   });
   it("outdated charge cannot be paid or cancelled", () => { render(<MonthlyChargeCard {...props} status="outdated" computedAmount={20} />); expect(screen.queryByText("Marcar como pago")).toBeNull(); });

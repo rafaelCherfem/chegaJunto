@@ -3,7 +3,7 @@ import type { MonthlyChargeCardProps } from "@/components/charges/MonthlyChargeC
 import { RefundChip } from "@/components/charges/RefundChip";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
-import { chargeState } from "@/utils/chargeState";
+import { chargeState, chargeTexts } from "@/utils/chargeState";
 import { formatCurrency } from "@/utils/currency";
 import { debtLabel, toCents } from "@/utils/money";
 
@@ -14,8 +14,20 @@ interface ChargeSheetProps extends Omit<MonthlyChargeCardProps, "onOpenDetails">
 }
 
 export function ChargeSheet({ monthLabel, open, onOpenChange, ...props }: ChargeSheetProps) {
-  const { settled, partial, cents, paidCents, outstandingCents, refundCents, hasObligation } =
-    chargeState(props);
+  const state = chargeState(props);
+  const {
+    settled,
+    partial,
+    isRefund,
+    refundStatus,
+    cents,
+    paidCents,
+    outstandingCents,
+    refundCents,
+    returnedCents,
+    hasObligation,
+  } = state;
+  const texts = chargeTexts(state);
   const closed = props.status === "closed";
   const showPay = closed && hasObligation && !settled;
   // "Desmarcar" desfaz o pagamento mais recente ainda válido, também numa cobrança
@@ -42,13 +54,13 @@ export function ChargeSheet({ monthLabel, open, onOpenChange, ...props }: Charge
               {settled && hasObligation ? (
                 <span className="inline-flex items-center gap-1.5">
                   <Check className="h-3.5 w-3.5" aria-hidden="true" />
-                  Pagamento recebido
+                  {texts.settledText}
                 </span>
               ) : (
-                debtLabel(partial ? outstandingCents : cents)
+                debtLabel(partial || isRefund ? outstandingCents : cents)
               )}
             </p>
-            {refundCents > 0 && (
+            {(refundStatus === "due" || refundStatus === "overpaid") && (
               <div className="mt-2">
                 <RefundChip />
               </div>
@@ -73,7 +85,13 @@ export function ChargeSheet({ monthLabel, open, onOpenChange, ...props }: Charge
             <dt>Total do mês</dt>
             <dd>{formatCurrency(props.amount)}</dd>
           </div>
-          {paidCents !== 0 && (
+          {returnedCents > 0 && (
+            <div>
+              <dt>Já devolvido</dt>
+              <dd>{formatCurrency(returnedCents / 100)}</dd>
+            </div>
+          )}
+          {paidCents > 0 && (
             <div>
               <dt>Já pago</dt>
               <dd>{formatCurrency(paidCents / 100)}</dd>
@@ -81,11 +99,11 @@ export function ChargeSheet({ monthLabel, open, onOpenChange, ...props }: Charge
           )}
           {partial && (
             <div>
-              <dt>Falta pagar</dt>
-              <dd>{formatCurrency(outstandingCents / 100)}</dd>
+              <dt>{isRefund ? "Falta devolver" : "Falta pagar"}</dt>
+              <dd>{formatCurrency((isRefund ? refundCents : outstandingCents) / 100)}</dd>
             </div>
           )}
-          {refundCents > 0 && (
+          {refundCents > 0 && !(isRefund && partial) && (
             <div>
               <dt>Saldo a devolver</dt>
               <dd>{formatCurrency(refundCents / 100)}</dd>
@@ -107,7 +125,7 @@ export function ChargeSheet({ monthLabel, open, onOpenChange, ...props }: Charge
               aria-busy={props.toggling}
               onClick={props.onMarkPaid}
             >
-              {partial ? `Pagar ${formatCurrency(outstandingCents / 100)}` : "Marcar como pago"}
+              {texts.payLabel}
             </Button>
           )}
           <Button
@@ -131,7 +149,7 @@ export function ChargeSheet({ monthLabel, open, onOpenChange, ...props }: Charge
               onClick={props.onUnmarkPaid}
             >
               <Undo2 className="h-4 w-4 shrink-0" aria-hidden="true" />
-              Desmarcar pagamento
+              {texts.unmarkLabel}
             </Button>
           </div>
         )}

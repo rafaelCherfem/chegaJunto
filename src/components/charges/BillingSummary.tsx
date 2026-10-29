@@ -1,4 +1,4 @@
-import { toCents } from "@/utils/money";
+import { chargeState } from "@/utils/chargeState";
 
 type BillingRow = {
   amount: number;
@@ -8,13 +8,12 @@ type BillingRow = {
 };
 
 export function BillingSummary({ rows }: { rows: BillingRow[] }) {
-  const obligations = rows.filter(
-    (row) =>
-      row.status === "closed" &&
-      (toCents(row.amount) !== 0 || toCents(row.paidAmount ?? 0) !== 0),
-  );
-  const pending = obligations.filter((row) => !row.paid).length;
-  const paid = obligations.filter((row) => row.paid).length;
+  const obligations = rows
+    .filter((row) => row.status === "closed")
+    .map(chargeState)
+    .filter((state) => state.hasObligation);
+  const pending = obligations.filter((state) => !state.settled).length;
+  const paid = obligations.filter((state) => state.settled).length;
   const previews = rows.filter((row) => row.status === "preview").length;
   const outdated = rows.filter((row) => row.status === "outdated").length;
   return (
