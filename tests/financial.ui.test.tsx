@@ -31,9 +31,9 @@ describe("integral payment card", () => {
   it("partial charge shows only the outstanding amount as owed", () => { render(<MonthlyChargeCard {...props} amount={20} paidAmount={5} />); expect(screen.getByText(/Passageiro deve R\$\s15,00/)).toBeTruthy(); expect(screen.queryByText(/Passageiro deve R\$\s20,00/)).toBeNull(); expect(screen.getByText("Parcialmente pago")).toBeTruthy(); });
 });
 describe("billing summary", () => {
-  it("counts a settled charge with refund as paid and a partial one as pending", () => {
-    render(<BillingSummary rows={[{ amount: 0, paidAmount: 20, paid: true, status: "closed" }, { amount: 20, paidAmount: 5, paid: false, status: "closed" }]} />);
-    expect(screen.getByText(/1 pendente\b/)).toBeTruthy(); expect(screen.getByText(/1 paga\b/)).toBeTruthy();
+  it("counts a charge with an open refund and a partial one as pending, an exact payment as paid", () => {
+    render(<BillingSummary rows={[{ amount: 0, paidAmount: 20, paid: true, status: "closed" }, { amount: 20, paidAmount: 5, paid: false, status: "closed" }, { amount: 30, paidAmount: 30, paid: true, status: "closed" }]} />);
+    expect(screen.getByText(/2 pendentes/)).toBeTruthy(); expect(screen.getByText(/1 paga\b/)).toBeTruthy();
   });
 });
 describe("month hero", () => {

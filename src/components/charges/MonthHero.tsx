@@ -27,7 +27,7 @@ export function MonthHero({ rows, monthLabel }: MonthHeroProps) {
   let unsettled = 0;
   for (const row of closed) {
     const state = chargeState(row);
-    if (state.hasObligation && !state.settled) unsettled += 1;
+    if (state.open) unsettled += 1;
     refundCents = addCents(refundCents, state.refundCents);
     if (state.isRefund) continue;
     const covered = state.settled
@@ -38,9 +38,8 @@ export function MonthHero({ rows, monthLabel }: MonthHeroProps) {
   }
 
   const totalCents = addCents(pendingCents, paidCents);
-  // Mês fechado e recebido: algo a receber existiu, nada ficou em aberto e não há
-  // prévia nem cobrança desatualizada esperando cálculo. Um saldo a devolver não
-  // impede o selo; a linha de saldo a devolver continua visível abaixo.
+  // Mês fechado e recebido: algo a receber existiu, nada ficou em aberto (nem
+  // devolução pendente) e não há prévia nem cobrança desatualizada esperando cálculo.
   const allReceived =
     totalCents > 0 &&
     unsettled === 0 &&
