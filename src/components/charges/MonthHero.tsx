@@ -2,7 +2,8 @@ import { BillingSummary } from "@/components/charges/BillingSummary";
 import { CompleteMark } from "@/components/ui/complete-mark";
 import { useCountUp } from "@/hooks/useCountUp";
 import { formatCurrency } from "@/utils/currency";
-import { addCents, toCents } from "@/utils/money";
+import { chargeState } from "@/utils/chargeState";
+import { addCents } from "@/utils/money";
 
 type BillingRow = {
   amount: number;
@@ -25,17 +26,15 @@ export function MonthHero({ rows, monthLabel }: MonthHeroProps) {
   let refundCents = 0;
   let unsettled = 0;
   for (const row of closed) {
-    const cents = toCents(row.amount);
-    if (!row.paid && (cents !== 0 || toCents(row.paidAmount ?? 0) !== 0)) unsettled += 1;
-    if (cents < 0) {
-      refundCents = addCents(refundCents, -cents);
-      continue;
-    }
-    const alreadyPaid = toCents(row.paidAmount ?? 0);
-    const covered = row.paid ? cents : Math.min(Math.max(alreadyPaid, 0), cents);
+    const state = chargeState(row);
+    if (state.hasObligation && !state.settled) unsettled += 1;
+    refundCents = addCents(refundCents, state.refundCents);
+    if (state.isRefund) continue;
+    const covered = state.settled
+      ? state.cents
+      : Math.min(Math.max(state.paidCents, 0), state.cents);
     paidCents = addCents(paidCents, covered);
-    pendingCents = addCents(pendingCents, cents - covered);
-    if (alreadyPaid > cents) refundCents = addCents(refundCents, alreadyPaid - cents);
+    pendingCents = addCents(pendingCents, state.cents - covered);
   }
 
   const totalCents = addCents(pendingCents, paidCents);

@@ -133,6 +133,27 @@ describe("monthly receipt text", () => {
     );
   });
 
+  it("negative total with the refund registered says the refund was made, never paid", () => {
+    const text = tail(
+      receiptText(
+        { totalAmount: -3, paid: true, paidAmount: -3, paidAt: "2026-10-15T15:00:00Z" },
+        [received("2026-10-14", 33)],
+      ),
+    );
+    expect(text).toBe(
+      "Total do mês: -R$ 3,00\nDevolvido: R$ 3,00\nSituação: devolução feita em 15/10/2026",
+    );
+    expect(text).not.toContain("pago");
+  });
+
+  it("negative total with a partial refund shows what was returned and what is left", () => {
+    expect(
+      tail(receiptText({ totalAmount: -3, paidAmount: -1 }, [received("2026-10-14", 33)])),
+    ).toBe(
+      "Total do mês: -R$ 3,00\nJá devolvido: R$ 1,00\nFalta devolver: R$ 2,00\nSituação: devolução parcial",
+    );
+  });
+
   it("zero total without payment has no obligation", () => {
     expect(tail(receiptText({ totalAmount: 0 }, [], []))).toBe(
       "Total do mês: R$ 0,00\nNenhum valor pendente\nSituação: sem obrigação",

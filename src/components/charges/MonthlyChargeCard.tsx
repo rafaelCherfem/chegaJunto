@@ -2,7 +2,7 @@ import { Check, ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 import { RefundChip } from "@/components/charges/RefundChip";
 import { Button } from "@/components/ui/button";
-import { chargeState, type ChargeStatus } from "@/utils/chargeState";
+import { chargeState, chargeTexts, type ChargeStatus } from "@/utils/chargeState";
 import { formatCurrency } from "@/utils/currency";
 import { debtLabel } from "@/utils/money";
 import { initials } from "@/utils/initials";
@@ -27,8 +27,20 @@ export interface MonthlyChargeCardProps {
 }
 
 export function MonthlyChargeCard(props: MonthlyChargeCardProps) {
-  const { settled, partial, cents, paidCents, outstandingCents, refundCents, hasObligation } =
-    chargeState(props);
+  const state = chargeState(props);
+  const {
+    settled,
+    partial,
+    isRefund,
+    refundStatus,
+    cents,
+    paidCents,
+    outstandingCents,
+    refundCents,
+    returnedCents,
+    hasObligation,
+  } = state;
+  const texts = chargeTexts(state);
   const showPayAction = props.status === "closed" && hasObligation && !settled;
   const summary = (
     <>
@@ -48,17 +60,25 @@ export function MonthlyChargeCard(props: MonthlyChargeCardProps) {
               {props.status === "preview" ? "Prévia" : "Desatualizado"}
             </span>
           )}
-          {refundCents > 0 && <RefundChip />}
-          {settled && hasObligation && refundCents === 0 && (
+          {(refundStatus === "due" || refundStatus === "overpaid") && <RefundChip />}
+          {settled && hasObligation && refundStatus === null && (
             <span className="charge-status charge-status--paid">
               <Check className="h-3.5 w-3.5" aria-hidden="true" />
               Pago
             </span>
           )}
-          {partial && (
-            <span className="charge-status charge-status--pending">Parcialmente pago</span>
+          {refundStatus === "done" && (
+            <span className="charge-status charge-status--paid">
+              <Check className="h-3.5 w-3.5" aria-hidden="true" />
+              Devolvido
+            </span>
           )}
-          {props.status === "closed" && !props.paid && !partial && cents !== 0 && (
+          {partial && (
+            <span className="charge-status charge-status--pending">
+              {isRefund ? "Devolução parcial" : "Parcialmente pago"}
+            </span>
+          )}
+          {props.status === "closed" && !props.paid && !partial && !isRefund && cents !== 0 && (
             <span className="charge-status charge-status--pending">Pendente</span>
           )}
         </div>
@@ -67,19 +87,25 @@ export function MonthlyChargeCard(props: MonthlyChargeCardProps) {
         {formatCurrency(props.amount)}
       </p>
       {settled && hasObligation ? (
-        <p className="mt-1 text-sm text-muted-foreground">Pagamento recebido</p>
+        <p className="mt-1 text-sm text-muted-foreground">{texts.settledText}</p>
       ) : (
         <p className="mt-1 text-sm text-muted-foreground">
-          {debtLabel(partial ? outstandingCents : cents)}
+          {debtLabel(partial || isRefund ? outstandingCents : cents)}
         </p>
       )}
-      {partial && (
+      {partial && !isRefund && (
         <p className="mt-2 text-sm tabular-nums text-muted-foreground">
           Já pago: {formatCurrency(paidCents / 100)} · Falta pagar:{" "}
           {formatCurrency(outstandingCents / 100)}
         </p>
       )}
-      {refundCents > 0 && (
+      {partial && isRefund && (
+        <p className="mt-2 text-sm tabular-nums text-muted-foreground">
+          Já devolvido: {formatCurrency(returnedCents / 100)} · Falta devolver:{" "}
+          {formatCurrency(refundCents / 100)}
+        </p>
+      )}
+      {refundCents > 0 && !partial && paidCents > 0 && (
         <p className="mt-2 text-sm tabular-nums text-muted-foreground">
           Já pago: {formatCurrency(paidCents / 100)} · Saldo a devolver:{" "}
           {formatCurrency(refundCents / 100)}
@@ -116,7 +142,7 @@ export function MonthlyChargeCard(props: MonthlyChargeCardProps) {
             aria-busy={props.toggling}
             onClick={props.onMarkPaid}
           >
-            {partial ? `Pagar ${formatCurrency(outstandingCents / 100)}` : "Marcar como pago"}
+            {texts.payLabel}
           </Button>
         </div>
       )}

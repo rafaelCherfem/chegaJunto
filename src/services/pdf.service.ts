@@ -44,7 +44,13 @@ function receiptSituation(charge: MonthlyCharge): ReceiptLine[] {
     const paidOn = charge.paidAt
       ? ` em ${formatDateDisplay(isoDateFromTimestamp(charge.paidAt))}`
       : "";
-    const refundCents = cents >= 0 && paidCents > cents ? paidCents - cents : 0;
+    if (cents < 0) {
+      return [
+        { text: `Devolvido: ${formatCurrency(-paidCents / 100)}` },
+        { text: `Situação: devolução feita${paidOn}`, bold: true },
+      ];
+    }
+    const refundCents = paidCents > cents ? paidCents - cents : 0;
     const lines: ReceiptLine[] = [];
     if (paidCents > 0) lines.push({ text: `Já pago: ${formatCurrency(paidCents / 100)}` });
     if (refundCents > 0) {
@@ -54,6 +60,14 @@ function receiptSituation(charge: MonthlyCharge): ReceiptLine[] {
       lines.push({ text: `Situação: pago integralmente${paidOn}`, bold: true });
     }
     return lines;
+  }
+
+  if (cents < 0 && paidCents < 0) {
+    return [
+      { text: `Já devolvido: ${formatCurrency(-paidCents / 100)}` },
+      { text: `Falta devolver: ${formatCurrency((paidCents - cents) / 100)}` },
+      { text: "Situação: devolução parcial" },
+    ];
   }
 
   if (paidCents !== 0) {
