@@ -30,7 +30,7 @@ select throws_ok($$update public.received_rides set received_date=(select today+
 select is((select count(*) from public.received_rides where passenger_id='72000000-0000-0000-0000-000000000001'),2::bigint,'UTC received_rides: failed writes leave two original rows');
 select lives_ok($$select public.recalculate_charge('72000000-0000-0000-0000-000000000001','2024-02-01')$$,'UTC: canonical competence accepted');
 select throws_ok($$select public.recalculate_charge('72000000-0000-0000-0000-000000000001','2024-02-29')$$,'23514',null,'UTC: noncanonical competence rejected');
-select throws_ok($$reset role; update public.monthly_charges set reference_month='2024-02-02' where passenger_id='72000000-0000-0000-0000-000000000001'; set local role authenticated$$,'23514',null,'UTC: noncanonical UPDATE rejected');
+select throws_ok($$reset role; update public.monthly_charges set reference_month='2024-02-02' where passenger_id='72000000-0000-0000-0000-000000000001'; set local role authenticated$$,'23514','Identidade e vínculo não podem ser alterados.','UTC: reference_month UPDATE rejected (legacy, immutable)');
 set local time zone 'America/Sao_Paulo';
 select is(('2026-10-01T02:30:00Z'::timestamptz at time zone 'America/Sao_Paulo')::date,date '2026-09-30','America/Sao_Paulo: fixed UTC instant maps to previous Sao Paulo day');
 select lives_ok($$insert into public.rides(user_id,passenger_id,ride_date,rate_charged) select auth.uid(),'72000000-0000-0000-0000-000000000002',today+(0),10 from business_day$$,'America/Sao_Paulo rides: today accepted');
@@ -47,7 +47,7 @@ select throws_ok($$update public.received_rides set received_date=(select today+
 select is((select count(*) from public.received_rides where passenger_id='72000000-0000-0000-0000-000000000002'),2::bigint,'America/Sao_Paulo received_rides: failed writes leave two original rows');
 select lives_ok($$select public.recalculate_charge('72000000-0000-0000-0000-000000000002','2024-02-01')$$,'America/Sao_Paulo: canonical competence accepted');
 select throws_ok($$select public.recalculate_charge('72000000-0000-0000-0000-000000000002','2024-02-29')$$,'23514',null,'America/Sao_Paulo: noncanonical competence rejected');
-select throws_ok($$reset role; update public.monthly_charges set reference_month='2024-02-02' where passenger_id='72000000-0000-0000-0000-000000000002'; set local role authenticated$$,'23514',null,'America/Sao_Paulo: noncanonical UPDATE rejected');
+select throws_ok($$reset role; update public.monthly_charges set reference_month='2024-02-02' where passenger_id='72000000-0000-0000-0000-000000000002'; set local role authenticated$$,'23514','Identidade e vínculo não podem ser alterados.','America/Sao_Paulo: reference_month UPDATE rejected (legacy, immutable)');
 set local time zone 'Asia/Tokyo';
 select is(('2026-10-01T02:30:00Z'::timestamptz at time zone 'America/Sao_Paulo')::date,date '2026-09-30','Asia/Tokyo: fixed UTC instant maps to previous Sao Paulo day');
 select lives_ok($$insert into public.rides(user_id,passenger_id,ride_date,rate_charged) select auth.uid(),'72000000-0000-0000-0000-000000000003',today+(0),10 from business_day$$,'Asia/Tokyo rides: today accepted');
@@ -64,7 +64,7 @@ select throws_ok($$update public.received_rides set received_date=(select today+
 select is((select count(*) from public.received_rides where passenger_id='72000000-0000-0000-0000-000000000003'),2::bigint,'Asia/Tokyo received_rides: failed writes leave two original rows');
 select lives_ok($$select public.recalculate_charge('72000000-0000-0000-0000-000000000003','2024-02-01')$$,'Asia/Tokyo: canonical competence accepted');
 select throws_ok($$select public.recalculate_charge('72000000-0000-0000-0000-000000000003','2024-02-29')$$,'23514',null,'Asia/Tokyo: noncanonical competence rejected');
-select throws_ok($$reset role; update public.monthly_charges set reference_month='2024-02-02' where passenger_id='72000000-0000-0000-0000-000000000003'; set local role authenticated$$,'23514',null,'Asia/Tokyo: noncanonical UPDATE rejected');
+select throws_ok($$reset role; update public.monthly_charges set reference_month='2024-02-02' where passenger_id='72000000-0000-0000-0000-000000000003'; set local role authenticated$$,'23514','Identidade e vínculo não podem ser alterados.','Asia/Tokyo: reference_month UPDATE rejected (legacy, immutable)');
 select lives_ok($$insert into public.rides(user_id,passenger_id,ride_date,rate_charged) values(auth.uid(),'72000000-0000-0000-0000-000000000001','2024-02-29',10)$$,'leap day accepted');
 select throws_ok($$insert into public.rides(user_id,passenger_id,ride_date,rate_charged) values(auth.uid(),'72000000-0000-0000-0000-000000000001','2025-02-29',10)$$,'22008',null,'invalid leap day rejected by DATE');
 select throws_ok($$insert into public.received_rides(user_id,passenger_id,received_date,amount) values(auth.uid(),'72000000-0000-0000-0000-000000000001','2026-04-31',10)$$,'22008',null,'invalid calendar date rejected by DATE');
