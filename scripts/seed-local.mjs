@@ -24,7 +24,10 @@ const PASSENGERS = [
   { name: "Carlos Eduardo Lima", rate: 25 },
   { name: "Marina Duarte", rate: 32 },
   { name: "João Pedro Alves", rate: 22 },
+  // Quinto passageiro: um ciclo livre que cruza meses (ver seedCycle).
+  { name: "Fernanda Rocha", rate: 28 },
 ];
+const MONTHLY_PASSENGERS = 4; // os quatro primeiros seguem os MONTHS; o quinto usa close_cycle.
 
 // outcome: pending (sem pagamento), partial (paga e lança outra diária depois),
 // paid (paga por completo), refund (paga e apaga diárias depois: saldo a devolver).
@@ -315,6 +318,65 @@ async function seedMonth(user, userId, passengers, today, plan) {
   }
 }
 
+// Ciclo livre do quinto passageiro: diárias dos dias úteis do primeiro dia útil do mês
+// anterior até hoje (menos um dia deixado de fora), close_cycle(hoje), um pagamento e,
+// depois dele, a diária que faltava dentro do ciclo já fechado (pagamento parcial).
+// Entra DEPOIS dos meses: se tivesse diária antes, o close_month dos outros a incluiria.
+function cycleWindow(today) {
+  const previous = monthInfo(today, -1);
+  const current = monthInfo(today, 0);
+  const days = [...previous.days, ...current.days];
+  const spare = days[Math.floor(days.length / 2)];
+  return {
+    start: days[0],
+    end: isoDate(today.y, today.m, today.d),
+    days,
+    spare,
+  };
+}
+
+async function seedCycle(user, userId, passenger, today) {
+  const window = cycleWindow(today);
+  if (window.days.length < 6) {
+    throw new Error(`Poucos dias úteis (${window.days.length}) para o ciclo livre. Rode a partir do dia 6.`);
+  }
+  const rides = window.days
+    .filter((d) => d !== window.spare)
+    .map((ride_date) => ({
+      user_id: userId,
+      passenger_id: passenger.id,
+      ride_date,
+      rate_charged: passenger.rate,
+    }));
+  unwrap(await user.from("rides").insert(rides), "Inserir diárias do ciclo livre");
+
+  const summary = unwrap(
+    await user.rpc("close_cycle", { end_date: window.end }),
+    "Fechar ciclo",
+  );
+  const mine = summary.find((row) => row.passenger_id === passenger.id);
+  if (!mine || mine.status !== "CLOSED") {
+    throw new Error(
+      `close_cycle não fechou o ciclo do quinto passageiro (status ${mine?.status ?? "ausente"}). ${RESET_HINT}`,
+    );
+  }
+  unwrap(
+    await user
+      .rpc("pay_charge", { target_charge: mine.charge_id, expected_revision: 1 })
+      .single(),
+    "Registrar pagamento do ciclo",
+  );
+  unwrap(
+    await user.from("rides").insert({
+      user_id: userId,
+      passenger_id: passenger.id,
+      ride_date: window.spare,
+      rate_charged: passenger.rate,
+    }),
+    "Inserir diária dentro do ciclo fechado",
+  );
+}
+
 function stateOf(charge) {
   const total = cents(charge.total_amount);
   const paid = cents(charge.paid_amount);
@@ -358,6 +420,38 @@ async function summarize(user, passengers, today) {
       });
     });
   }
+  // Ciclo livre do quinto passageiro: confere período e estado esperados.
+  const cyclePassenger = passengers[MONTHLY_PASSENGERS];
+  const window = cycleWindow(today);
+  const cycle = unwrap(
+    await user
+      .from("monthly_charges")
+      .select("total_amount,paid_amount,paid,period_start,period_end")
+      .eq("passenger_id", cyclePassenger.id),
+    "Ler o ciclo livre para o resumo",
+  );
+  const found = cycle.length === 1 ? stateOf(cycle[0]) : `${cycle.length} cobranças`;
+  if (
+    cycle.length !== 1 ||
+    cycle[0].period_start !== window.start ||
+    cycle[0].period_end !== window.end ||
+    found !== "Parcial"
+  ) {
+    throw new Error(
+      `Ciclo livre de ${cyclePassenger.name} fora do esperado (${window.start} a ${window.end}, "Parcial"); encontrado: ${found}. ${RESET_HINT}`,
+    );
+  }
+  const total = Number(cycle[0].total_amount);
+  const paid = Number(cycle[0].paid_amount);
+  rows.push({
+    Mês: `${window.start} a ${window.end}`,
+    Passageiro: cyclePassenger.name,
+    Total: money(total),
+    Pago: money(paid),
+    "A pagar": money(Math.max(total - paid, 0)),
+    "Saldo a devolver": money(Math.max(paid - total, 0)),
+    Estado: found,
+  });
   console.table(rows);
 }
 
@@ -395,13 +489,19 @@ async function main() {
     for (const plan of MONTHS) {
       await seedMonth(user, userId, passengers, today, plan);
     }
+    await seedCycle(user, userId, passengers[MONTHLY_PASSENGERS], today);
     console.log("Dados de teste criados.");
   } else {
     passengers = PASSENGERS.map((p) => ({
       ...p,
       id: existing.find((row) => row.name === p.name)?.id,
     }));
-    if (existing.length !== PASSENGERS.length || passengers.some((p) => !p.id)) {
+    if (existing.length !== PASSENGERS.length) {
+      throw new Error(
+        `O banco local tem ${existing.length} passageiro(s) e este seed espera ${PASSENGERS.length} (o seed ganhou o ciclo livre do quinto passageiro). Os dados são de uma versão anterior do seed e não dá para completá-los sem apagar. ${RESET_HINT}`,
+      );
+    }
+    if (passengers.some((p) => !p.id)) {
       throw new Error(
         `O usuário de teste já tem passageiros que não são os do seed. ${RESET_HINT}`,
       );
