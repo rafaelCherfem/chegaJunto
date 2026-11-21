@@ -1,6 +1,7 @@
-import type { Database } from "@/types/database";
+import type { CycleSummaryDbRow, Database } from "@/types/database";
 import type {
   ChargePaymentEvent,
+  CycleSummaryRow,
   MonthlyCharge,
   Passenger,
   PassengerInvite,
@@ -79,10 +80,24 @@ export function toMonthlyCharge(row: MonthlyChargeRow): MonthlyCharge {
     id: row.id,
     passengerId: row.passenger_id,
     referenceMonth: row.reference_month,
+    periodStart: row.period_start,
+    periodEnd: row.period_end,
     totalAmount: row.total_amount,
     paid: row.paid,
     paidAmount: row.paid_amount,
     paidAt: row.paid_at,
     createdAt: row.created_at,
+  };
+}
+
+export function toCycleSummaryRow(row: CycleSummaryDbRow): CycleSummaryRow {
+  return {
+    passengerId: row.passenger_id,
+    status: row.status,
+    reason: row.reason,
+    chargeId: row.charge_id,
+    periodStart: row.period_start,
+    periodEnd: row.period_end,
+    totalAmount: row.total_amount,
   };
 }

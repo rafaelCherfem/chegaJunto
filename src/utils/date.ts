@@ -76,6 +76,19 @@ export function formatDateDisplay(value: string): string {
   assertCalendarDate(value);
   return `${value.slice(8, 10)}/${value.slice(5, 7)}/${value.slice(0, 4)}`;
 }
+/** Período fechado nas duas pontas: datas válidas e início não depois do fim. */
+export function assertPeriod(start: string, end: string): void {
+  assertCalendarDate(start);
+  assertCalendarDate(end);
+  if (compareCalendarDates(start, end) > 0)
+    throw new Error("Período inválido: o início vem depois do fim.");
+}
+/** Troca toda data ISO (AAAA-MM-DD) de um texto por dd/mm/aaaa; o resto fica como está. */
+export function formatIsoDatesInText(text: string): string {
+  return text.replace(/\d{4}-\d{2}-\d{2}/g, (value) =>
+    isCalendarDate(value) ? formatDateDisplay(value) : value,
+  );
+}
 export function formatMonthLabel(value: string): string {
   assertReferenceMonth(value);
   const months = [

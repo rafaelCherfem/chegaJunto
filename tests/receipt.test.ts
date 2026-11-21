@@ -38,6 +38,8 @@ const charge = (overrides: Partial<MonthlyCharge>): MonthlyCharge => ({
   id: "c1",
   passengerId: "p1",
   referenceMonth: "2026-10-01",
+  periodStart: "2026-10-01",
+  periodEnd: "2026-10-31",
   totalAmount: 30,
   paid: false,
   paidAmount: 0,

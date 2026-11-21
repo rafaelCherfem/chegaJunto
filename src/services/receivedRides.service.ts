@@ -1,7 +1,13 @@
 import { requestSignal, type SessionScope } from "@/lib/sessionScope";
-import { assertRecordDate, FUTURE_DATE_ERROR, monthBounds } from "@/utils/date";
+import {
+  assertPeriod,
+  assertRecordDate,
+  FUTURE_DATE_ERROR,
+  monthBounds,
+} from "@/utils/date";
 import { toCents } from "@/utils/money";
 import { errorMessages } from "@/constants/errorMessages";
+import { mapCycleError } from "@/lib/cycleErrors";
 import { toReceivedRide } from "@/lib/mappers";
 import { getCurrentUserId, supabase } from "@/lib/supabase";
 import type { ReceivedRide } from "@/types/entities";
@@ -24,6 +30,35 @@ export async function listReceivedRidesByMonth(
     .select("*")
     .gte("received_date", monthStart)
     .lt("received_date", monthEnd)
+    .order("received_date");
+
+  if (passengerId) {
+    query = query.eq("passenger_id", passengerId);
+  }
+
+  const { data, error } = await query.abortSignal(requestSignal(scope));
+
+  if (error) {
+    throw new Error(errorMessages.unexpected);
+  }
+
+  return data.map(toReceivedRide);
+}
+
+// Compensações entre duas datas, ambas inclusivas (ciclo da cobrança).
+export async function listReceivedRidesByPeriod(
+  periodStart: string,
+  periodEnd: string,
+  passengerId?: string,
+  scope?: SessionScope,
+): Promise<ReceivedRide[]> {
+  assertPeriod(periodStart, periodEnd);
+
+  let query = supabase
+    .from("received_rides")
+    .select("*")
+    .gte("received_date", periodStart)
+    .lte("received_date", periodEnd)
     .order("received_date");
 
   if (passengerId) {
@@ -62,7 +97,7 @@ export async function createReceivedRide(
   if (error) {
     if (error.code === "23514" && error.message.includes("FUTURE_DATE"))
       throw new Error(FUTURE_DATE_ERROR);
-    throw new Error(errorMessages.unexpected);
+    throw mapCycleError(error) ?? new Error(errorMessages.unexpected);
   }
 
   return toReceivedRide(data);

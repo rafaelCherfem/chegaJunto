@@ -386,6 +386,8 @@ describe("session regression — actual Auth events and React Query", () => {
                 id: "C",
                 passengerId: "P",
                 referenceMonth: "2025-01-01",
+                periodStart: "2025-01-01",
+                periodEnd: "2025-01-31",
                 revision: 1, activePaymentId: "payment", totalAmount: 10,
                 paid: true,
                 paidAmount: 10,

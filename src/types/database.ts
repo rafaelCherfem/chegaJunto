@@ -1,6 +1,17 @@
 export type Json =
   string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
+// Linha devolvida por close_cycle e preview_cycle.
+export interface CycleSummaryDbRow {
+  passenger_id: string;
+  status: "CLOSED" | "SKIPPED" | "NO_MOVEMENT";
+  reason: string | null;
+  charge_id: string | null;
+  period_start: string | null;
+  period_end: string | null;
+  total_amount: number | null;
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -76,6 +87,8 @@ export interface Database {
           user_id: string;
           passenger_id: string;
           reference_month: string;
+          period_start: string;
+          period_end: string;
           total_amount: number;
           paid: boolean;
           paid_amount: number;
@@ -87,6 +100,8 @@ export interface Database {
           user_id: string;
           passenger_id: string;
           reference_month: string;
+          period_start?: string;
+          period_end?: string;
           total_amount: number;
           paid?: boolean;
           paid_amount?: number;
@@ -98,6 +113,8 @@ export interface Database {
           user_id?: string;
           passenger_id?: string;
           reference_month?: string;
+          period_start?: string;
+          period_end?: string;
           total_amount?: number;
           paid?: boolean;
           paid_amount?: number;
@@ -235,6 +252,10 @@ export interface Database {
     Views: Record<string, never>;
     Functions: {
       close_month: { Args: { month_date: string }; Returns: Database["public"]["Tables"]["monthly_charges"]["Row"][] };
+      // Fechamento por ciclo (migração 0013). SKIPPED não traz period_start nem cobrança;
+      // NO_MOVEMENT e a prévia não trazem charge_id; só CLOSED traz total_amount.
+      close_cycle: { Args: { end_date: string }; Returns: CycleSummaryDbRow[] };
+      preview_cycle: { Args: { end_date: string }; Returns: CycleSummaryDbRow[] };
       pay_charge: { Args: { target_charge: string; expected_revision: number }; Returns: Database["public"]["Tables"]["monthly_charges"]["Row"][] };
       cancel_charge_payment: { Args: { target_charge: string; target_payment: string }; Returns: Database["public"]["Tables"]["monthly_charges"]["Row"][] };
       is_responsible: { Args: Record<string, never>; Returns: boolean };
