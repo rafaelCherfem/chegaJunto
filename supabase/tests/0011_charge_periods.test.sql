@@ -146,7 +146,7 @@ select throws_ok($$select public.recalculate_charge('b2000000-0000-0000-0000-000
 select throws_ok($$select public.recalculate_charge('b2000000-0000-0000-0000-000000000001',null)$$,'23514','INVALID_COMPETENCE','null competence rejected');
 select throws_ok($$select public.close_month('2025-03-02')$$,'23514','INVALID_COMPETENCE','close_month still requires day 1');
 select throws_ok($$select public.recalculate_charge('b2000000-0000-0000-0000-000000000009','2025-03-01')$$,'42501','FINANCIAL_FORBIDDEN','foreign passenger still rejected');
-select throws_ok($$select public.recalculate_charge('b2000000-0000-0000-0000-000000000003','2025-06-01')$$,'23P01',null,'creating a month over an existing free cycle is rejected by the exclusion');
+select throws_ok($$select public.recalculate_charge('b2000000-0000-0000-0000-000000000003','2025-06-01')$$,'23514','CYCLE_OVERLAP','creating a month over an existing free cycle is rejected with a domain error');
 
 reset role;
 select * from finish();
