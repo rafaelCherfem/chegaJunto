@@ -164,7 +164,7 @@ export function MonthlyClosingPage() {
     setGeneratingId(charge.id);
 
     try {
-      await generateReceipt.mutateAsync({ passenger, charge, referenceMonth });
+      await generateReceipt.mutateAsync({ passenger, charge });
     } catch (error) {
       setActionError(
         error instanceof Error ? error.message : "Não foi possível gerar o comprovante.",
