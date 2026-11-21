@@ -2,12 +2,31 @@ import { usePrivateQuery, usePrivateMutation } from "@/hooks/usePrivateQuery";
 import {
   calculateMonthlyCharges,
   listChargePaymentEvents,
+  listCycleCharges,
   listMonthlyCharges,
+  listPaymentEventsForCharges,
   markMonthlyChargePaid,
   unmarkMonthlyChargePaid,
 } from "@/services/monthlyCharges.service";
 
 const monthlyChargesKey = ["monthlyCharges"] as const;
+
+// Todas as cobranças do responsável (os ciclos são agrupados na tela).
+export function useCycleCharges() {
+  return usePrivateQuery({
+    queryKey: [...monthlyChargesKey, "cycles"],
+    queryFn: (scope) => listCycleCharges(scope),
+  });
+}
+
+// Eventos de pagamento das cobranças carregadas, por id (não por mês de referência).
+export function usePaymentEventsForCharges(chargeIds: string[]) {
+  return usePrivateQuery({
+    queryKey: [...monthlyChargesKey, "payments", "by-charges", chargeIds.join(",")],
+    queryFn: (scope) => listPaymentEventsForCharges(chargeIds, scope),
+    enabled: chargeIds.length > 0,
+  });
+}
 
 export function useMonthlyCharges(referenceMonth: string) {
   return usePrivateQuery({

@@ -59,6 +59,17 @@ export function chargeState(input: ChargeStateInput) {
 
 export type ChargeState = ReturnType<typeof chargeState>;
 
+// O que ainda falta receber de uma cobrança fechada, com a mesma leitura do MonthHero:
+// só valor a favor entra (devolução e pago a mais ficam de fora), e o já pago abate.
+export function pendingCents(input: ChargeStateInput): number {
+  const state = chargeState(input);
+  if (input.status !== "closed" || state.isRefund) return 0;
+  const covered = state.settled
+    ? state.cents
+    : Math.min(Math.max(state.paidCents, 0), state.cents);
+  return state.cents - covered;
+}
+
 // Textos que dependem da direção do dinheiro: pagar (passageiro deve) ou devolver.
 export function chargeTexts(state: ChargeState) {
   const { isRefund, partial, outstandingCents, refundCents, refundStatus } = state;

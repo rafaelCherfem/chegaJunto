@@ -14,10 +14,13 @@ type BillingRow = {
 
 interface MonthHeroProps {
   rows: BillingRow[];
+  /** Rótulo do período mostrado (o nome da prop vem de quando o ciclo era o mês). */
   monthLabel: string;
+  /** Saldo a receber em ciclos que não são o mostrado; some quando for zero. */
+  otherOpenCents?: number | undefined;
 }
 
-export function MonthHero({ rows, monthLabel }: MonthHeroProps) {
+export function MonthHero({ rows, monthLabel, otherOpenCents = 0 }: MonthHeroProps) {
   const closed = rows.filter((row) => row.status === "closed");
   // Só valores a favor entram no total a receber; saldos negativos e o que
   // foi pago a mais são mostrados à parte para não se compensarem no destaque.
@@ -50,7 +53,7 @@ export function MonthHero({ rows, monthLabel }: MonthHeroProps) {
   return (
     <section className="month-hero" aria-labelledby="month-hero-title">
       <p id="month-hero-title" className="stat-label first-letter:uppercase">
-        A receber em {monthLabel}
+        A receber · {monthLabel}
       </p>
 
       <p className="stat-value mt-2.5 text-[clamp(2rem,10.5vw,2.75rem)] leading-none">
@@ -95,6 +98,12 @@ export function MonthHero({ rows, monthLabel }: MonthHeroProps) {
       {refundCents > 0 && (
         <p className="month-hero__refund mt-3 text-sm tabular-nums">
           Saldo a devolver: {formatCurrency(refundCents / 100)}
+        </p>
+      )}
+
+      {otherOpenCents > 0 && (
+        <p className="mt-3 text-sm tabular-nums text-muted-foreground">
+          Em aberto em outros ciclos: {formatCurrency(otherOpenCents / 100)}
         </p>
       )}
 

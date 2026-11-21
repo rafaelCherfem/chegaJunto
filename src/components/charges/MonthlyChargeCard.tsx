@@ -19,6 +19,8 @@ export interface MonthlyChargeCardProps {
   canUnmarkPaid?: boolean;
   toggling: boolean;
   generatingReceipt: boolean;
+  /** "desde 05/11": o passageiro começou depois do início do ciclo mostrado. */
+  sinceLabel?: string | undefined;
   onMarkPaid: () => void;
   onUnmarkPaid: () => void;
   onGenerateReceipt: () => void;
@@ -116,6 +118,9 @@ export function MonthlyChargeCard(props: MonthlyChargeCardProps) {
           Diárias: {formatCurrency(props.rideAmount)} · Compensação: −
           {formatCurrency(props.compensationAmount)}
         </p>
+      )}
+      {props.sinceLabel && (
+        <p className="mt-2 text-sm tabular-nums text-muted-foreground">{props.sinceLabel}</p>
       )}
       {props.status === "outdated" && props.computedAmount !== undefined && (
         <p className="mt-2 text-sm tabular-nums text-muted-foreground">

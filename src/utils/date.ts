@@ -76,6 +76,26 @@ export function formatDateDisplay(value: string): string {
   assertCalendarDate(value);
   return `${value.slice(8, 10)}/${value.slice(5, 7)}/${value.slice(0, 4)}`;
 }
+/** dd/mm, sem o ano (usado em "desde 05/11" dentro de um ciclo que já mostra o ano). */
+export function formatDayMonth(value: string): string {
+  assertCalendarDate(value);
+  return `${value.slice(8, 10)}/${value.slice(5, 7)}`;
+}
+/** "01/11/2026 a 06/12/2026". */
+export function formatPeriodLabel(start: string, end: string): string {
+  return `${formatDateDisplay(start)} a ${formatDateDisplay(end)}`;
+}
+/** O dia seguinte (AAAA-MM-DD), sem depender de fuso. */
+export function nextDay(value: string): string {
+  assertCalendarDate(value);
+  const date = new Date(
+    Date.UTC(Number(value.slice(0, 4)), Number(value.slice(5, 7)) - 1, Number(value.slice(8, 10)) + 1),
+  );
+  const year = String(date.getUTCFullYear()).padStart(4, "0");
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 /** Período fechado nas duas pontas: datas válidas e início não depois do fim. */
 export function assertPeriod(start: string, end: string): void {
   assertCalendarDate(start);

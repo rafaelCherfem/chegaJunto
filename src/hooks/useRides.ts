@@ -3,10 +3,35 @@ import {
   createRide,
   deleteRide,
   listRidesByMonth,
+  listRidesByPeriod,
   type CreateRideInput,
 } from "@/services/rides.service";
+import { EARLIEST_MOVEMENT_DATE, mergeById } from "@/utils/cycles";
 
 const ridesKey = ["rides"] as const;
+
+// Diárias de uma faixa única (start até end, inclusivas) mais todo o histórico dos passageiros
+// em extraPassengerIds (quem nunca fechou). start nulo = só os extras. A tela filtra por passageiro.
+export function useRidesByPeriod(
+  start: string | null,
+  end: string,
+  extraPassengerIds: string[],
+  enabled = true,
+) {
+  return usePrivateQuery({
+    enabled,
+    queryKey: [...ridesKey, "period", start, end, extraPassengerIds.join(",")],
+    queryFn: async (scope) => {
+      const lists = await Promise.all([
+        start === null ? Promise.resolve([]) : listRidesByPeriod(start, end, undefined, scope),
+        ...extraPassengerIds.map((id) =>
+          listRidesByPeriod(EARLIEST_MOVEMENT_DATE, end, id, scope),
+        ),
+      ]);
+      return mergeById(...lists);
+    },
+  });
+}
 
 export function useRidesByMonth(referenceMonth: string, enabled = true) {
   return usePrivateQuery({
