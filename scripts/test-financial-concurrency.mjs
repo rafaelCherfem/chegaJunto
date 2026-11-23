@@ -23,9 +23,10 @@ async function race(label,queries,extraErrors=[]){
  console.log(`${label}: sessions=${JSON.stringify(results.map(x=>x.code===0?'OK':'STALE_OBLIGATION'))}; deadlock=none`);return results;
 }
 
-function audit(label, revision, amount, paid, paymentCount, cancelCount, reopenCount) {
+function audit(label, revision, amount, paid, paymentCount, cancelCount, reopenCount, expectedPaidAmount = paid ? amount : 0, expectedPaidAt = paid) {
  const c=state(); assert.equal(c.revision,revision); assert.equal(c.total_amount,amount); assert.equal(c.paid,paid);
- assert.equal(c.paid_amount,paid?amount:0); assert.equal(Boolean(c.active_payment_id),paid);assert.equal(Boolean(c.paid_at),paid);
+ // 0009 (linhas 7 e 41-44): o recálculo preserva paid_amount; só a diferença continua a cobrar.
+ assert.equal(c.paid_amount,expectedPaidAmount); assert.equal(Boolean(c.active_payment_id),paid);assert.equal(Boolean(c.paid_at),expectedPaidAt); // 0009 linha 44: paid_at é mantido enquanto paid_amount<>0
  const events=JSON.parse(sql(`select coalesce(json_agg(e order by occurred_at,id),'[]'::json) from public.monthly_charge_events e where user_id='${owner}'`));
  assert.equal(events.filter(e=>e.kind==='PAYMENT').length,paymentCount);assert.equal(events.filter(e=>e.kind==='CANCEL').length,cancelCount);assert.equal(events.filter(e=>e.kind==='REOPEN').length,reopenCount);
  const versions=new Set(),reversals=new Set();
@@ -61,9 +62,9 @@ try{
  // Administrative fixture leaves a stale total deliberately. Both RPCs must compute persisted data.
  c=state();sql(`update public.rides set rate_charged=20 where user_id='${owner}';`);
  r=await race('C pay versus changed recalculation',[`select public.pay_charge('${c.id}',${c.revision})`,"select public.close_month('2025-01-01')"]);assert.equal(r.filter(x=>x.err.includes('STALE_OBLIGATION')).length,1);assert.equal(state().total_amount,20);assert.equal(state().paid,false);
- assert.equal(r[1].code,0);assert.ok(r[0].err.includes('STALE_OBLIGATION'));audit('C',4,20,false,3,2,1);
+ assert.equal(r[1].code,0);assert.ok(r[0].err.includes('STALE_OBLIGATION'));audit('C',4,20,false,3,2,1,10,true);
  r=await race('D ledger edit versus recalculation',[`update public.rides set rate_charged=30 where user_id='${owner}'`,"select public.close_month('2025-01-01')"]);assert.equal(state().total_amount,30);assert.equal(state().paid,false);
- assert.equal(r.filter(x=>x.code===0).length,2);audit('D',5,30,false,3,2,1);
+ assert.equal(r.filter(x=>x.code===0).length,2);audit('D',5,30,false,3,2,1,10,true);
  c=state();sql(`${auth}select public.pay_charge('${c.id}',${c.revision});`);const current=state();
  const stale=session(`${auth}select public.cancel_charge_payment('${c.id}','${sql(`select id from public.monthly_charge_events where user_id='${owner}' and kind='PAYMENT' order by occurred_at limit 1`)}');`);assert.ok((await stale.done).err.includes('STALE_OBLIGATION'));assert.equal(state().active_payment_id,current.active_payment_id);
  // H e I: fechamento por ciclo (0013). Segundo passageiro, datas fixas de 2025.
@@ -74,8 +75,22 @@ try{
  assert.equal(cycles[0].reference_month,cycles[0].period_start);
  r=await race('I close_cycle versus ride insert',["select * from public.close_cycle('2025-03-31')",`insert into public.rides(user_id,passenger_id,ride_date,rate_charged)values('${owner}','${passenger2}','2025-03-10',10)`],['INVALID_CYCLE_END']);
  assert.equal(r[1].code,0,'I: the ride insert must succeed');
- cycles=cyclesOf();assert.equal(cycles.length,2,'I: duplicated or missing cycle');
- assert.equal(cycles[1].period_start,'2025-03-01');assert.equal(cycles[1].period_end,'2025-03-31');assert.equal(cycles[1].total_amount,10,'I: the new cycle must count the ride whichever came first');
+ // A ordem das sessões não é travada: o insert pode entrar antes ou depois do close_cycle.
+ cycles=cyclesOf();const newRide=`select count(*) from public.rides where passenger_id='${passenger2}' and ride_date='2025-03-10'`;assert.equal(sql(newRide),'1','I: ride missing');
+ const insideAny=cycles.filter(x=>x.period_start<='2025-03-10'&&'2025-03-10'<=x.period_end);
+ if(cycles.length===2){
+  console.log('I order: insert first');
+  assert.equal(cycles[1].period_start,'2025-03-01');assert.equal(cycles[1].period_end,'2025-03-31');
+  assert.equal(insideAny.length,1,'I: new ride must be inside exactly one cycle');assert.equal(insideAny[0].id,cycles[1].id);
+  assert.equal(Number(sql(`select count(*) from public.rides where passenger_id='${passenger2}' and ride_date between '2025-03-01' and '2025-03-31'`)),1,'I: new cycle must hold exactly the inserted ride');
+  assert.equal(cycles[1].total_amount,10,'I: new cycle total must be the inserted ride');
+ } else {
+  console.log('I order: close first');
+  assert.equal(cycles.length,1,'I: duplicated or missing cycle');
+  assert.equal(insideAny.length,0,'I: new ride must stay outside every closed cycle');
+  assert.ok(cycles.every(x=>Number(x.total_amount)!==0),'I: zeroed charge created');
+ }
+ assert.equal(new Set(cycles.map(x=>x.period_start)).size,cycles.length,'I: duplicated cycle');
  assert.equal(Number(sql(`select count(*) from public.monthly_charges a join public.monthly_charges b on a.passenger_id=b.passenger_id and a.id<b.id and daterange(a.period_start,a.period_end,'[]')&&daterange(b.period_start,b.period_end,'[]') where a.passenger_id='${passenger2}'`)),0,'I: overlapping cycles');
  console.log('H/I close_cycle races: no deadlock, no duplicated or overlapping cycle');
  console.log('LOCAL financial concurrency PASS: A–G, final states and stale cancellation verified.');
