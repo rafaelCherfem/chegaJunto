@@ -73,6 +73,14 @@ try{
  r=await race('H close_cycle versus close_cycle',["select * from public.close_cycle('2025-02-28')","select * from public.close_cycle('2025-02-28')"],['INVALID_CYCLE_END']);
  let cycles=cyclesOf();assert.equal(cycles.length,1,'H: duplicated cycle');assert.equal(cycles[0].period_start,'2025-02-10');assert.equal(cycles[0].period_end,'2025-02-28');assert.equal(cycles[0].total_amount,10);
  assert.equal(cycles[0].reference_month,cycles[0].period_start);
+ // Saída do psql (-qAt): colunas separadas por '|' na ordem de close_cycle (passenger_id, status, reason, charge_id, period_start, period_end, total_amount).
+ const rowsOf=x=>x.out.split('\n').map(l=>l.split('|')).filter(f=>f.length===7&&f[0]===passenger2);
+ const mine=r.map(rowsOf);assert.ok(mine.every(m=>m.length===1),'H: each session must return exactly one row for passenger 2');
+ const rows=mine.map(m=>m[0]),closed=rows.filter(f=>f[1]==='CLOSED'),skipped=rows.filter(f=>f[1]==='SKIPPED');
+ assert.equal(closed.length,1,'H: exactly one session must close the cycle');assert.equal(skipped.length,1,'H: exactly one session must be skipped');
+ assert.equal(closed[0][3],cycles[0].id,'H: CLOSED must point to the stored cycle');assert.equal(closed[0][4],'2025-02-10');assert.equal(closed[0][5],'2025-02-28');assert.equal(Number(closed[0][6]),10);
+ assert.equal(skipped[0][2],'ALREADY_CLOSED_UNTIL');assert.equal(skipped[0][3],'','H: SKIPPED must not create a charge');assert.equal(skipped[0][5],'2025-02-28','H: SKIPPED must report the end of the last cycle');
+ assert.equal(Number(sql(`select count(*) from public.monthly_charges a join public.monthly_charges b on a.passenger_id=b.passenger_id and a.id<b.id and daterange(a.period_start,a.period_end,'[]')&&daterange(b.period_start,b.period_end,'[]') where a.passenger_id='${passenger2}'`)),0,'H: overlapping cycles');
  r=await race('I close_cycle versus ride insert',["select * from public.close_cycle('2025-03-31')",`insert into public.rides(user_id,passenger_id,ride_date,rate_charged)values('${owner}','${passenger2}','2025-03-10',10)`],['INVALID_CYCLE_END']);
  assert.equal(r[1].code,0,'I: the ride insert must succeed');
  // A ordem das sessões não é travada: o insert pode entrar antes ou depois do close_cycle.
