@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import assert from 'node:assert/strict';
 if(existsSync('supabase/.temp/project-ref'))throw Error('Remote link forbidden');
 const args=['exec','-i','supabase_db_rideledger','psql','-U','postgres','-d','postgres','-X','-qAt','-v','ON_ERROR_STOP=1'];
-const owner='91000000-0000-0000-0000-000000000001', passenger='92000000-0000-0000-0000-000000000001';
+const owner='91000000-0000-0000-0000-000000000001', passenger='92000000-0000-0000-0000-000000000001', passenger2='92000000-0000-0000-0000-000000000002';
 const children=[];
 function sql(query){const r=spawnSync('docker',args,{input:query,encoding:'utf8'});if(r.status!==0)throw Error(r.stderr);return r.stdout.trim();}
 function session(query,open=false){const child=spawn('docker',args);children.push(child);let out='',err='';child.stdout.on('data',d=>out+=d);child.stderr.on('data',d=>err+=d);const done=new Promise((resolve,reject)=>{child.on('error',reject);child.on('close',code=>resolve({code,out,err}));});if(open)child.stdin.write(query);else child.stdin.end(query);return {child,done,output:()=>out};}
@@ -11,21 +11,22 @@ async function until(fn){const deadline=Date.now()+15000;while(!fn()){if(Date.no
 const auth=`set role authenticated;set request.jwt.claim.sub='${owner}';set statement_timeout='12s';set lock_timeout='10s';`;
 const priorEvents = new Map();
 function state(){return JSON.parse(sql(`select row_to_json(c) from public.monthly_charges c where user_id='${owner}'`));}
-async function race(label,queries){
+async function race(label,queries,extraErrors=[]){
  const barrier=session(`begin;select public.financial_lock('${owner}');select 'READY';\n`,true);
  await until(()=>barrier.output().includes('READY'));
  const requests=queries.map((q,n)=>session(`set application_name='finance-race-${n}';${auth}${q};`));
  await until(()=>sql("select count(*) from pg_stat_activity where application_name like 'finance-race-%' and wait_event_type='Lock'")==='2');
  barrier.child.stdin.end('commit;\n');assert.equal((await barrier.done).code,0);
  const results=await Promise.all(requests.map(r=>r.done));
- for(const r of results)assert.ok(r.code===0||r.err.includes('STALE_OBLIGATION'),r.err);
+ for(const r of results)assert.ok(r.code===0||['STALE_OBLIGATION',...extraErrors].some(t=>r.err.includes(t)),r.err);
  for (const result of results) assert.ok(!/deadlock|40P01/i.test(result.err), result.err);
  console.log(`${label}: sessions=${JSON.stringify(results.map(x=>x.code===0?'OK':'STALE_OBLIGATION'))}; deadlock=none`);return results;
 }
 
-function audit(label, revision, amount, paid, paymentCount, cancelCount, reopenCount) {
+function audit(label, revision, amount, paid, paymentCount, cancelCount, reopenCount, expectedPaidAmount = paid ? amount : 0, expectedPaidAt = paid) {
  const c=state(); assert.equal(c.revision,revision); assert.equal(c.total_amount,amount); assert.equal(c.paid,paid);
- assert.equal(c.paid_amount,paid?amount:0); assert.equal(Boolean(c.active_payment_id),paid);assert.equal(Boolean(c.paid_at),paid);
+ // 0009 (linhas 7 e 41-44): o recálculo preserva paid_amount; só a diferença continua a cobrar.
+ assert.equal(c.paid_amount,expectedPaidAmount); assert.equal(Boolean(c.active_payment_id),paid);assert.equal(Boolean(c.paid_at),expectedPaidAt); // 0009 linha 44: paid_at é mantido enquanto paid_amount<>0
  const events=JSON.parse(sql(`select coalesce(json_agg(e order by occurred_at,id),'[]'::json) from public.monthly_charge_events e where user_id='${owner}'`));
  assert.equal(events.filter(e=>e.kind==='PAYMENT').length,paymentCount);assert.equal(events.filter(e=>e.kind==='CANCEL').length,cancelCount);assert.equal(events.filter(e=>e.kind==='REOPEN').length,reopenCount);
  const versions=new Set(),reversals=new Set();
@@ -42,7 +43,7 @@ function audit(label, revision, amount, paid, paymentCount, cancelCount, reopenC
  console.log(`${label} FINAL: revision=${c.revision}, amount=${c.total_amount}, paid=${c.paid}, active=${Boolean(c.active_payment_id)}, PAYMENT/CANCEL/REOPEN=${paymentCount}/${cancelCount}/${reopenCount}; immutable audit PASS`);
 }
 
-function cleanup(){sql(`update public.monthly_charges set active_payment_id=null where user_id='${owner}';delete from public.monthly_charge_events where user_id='${owner}';delete from public.monthly_charges where user_id='${owner}';delete from public.rides where user_id='${owner}';delete from public.received_rides where user_id='${owner}';delete from public.passengers where id='${passenger}';delete from public.responsible_accounts where user_id='${owner}';delete from auth.users where id='${owner}';`);}
+function cleanup(){sql(`update public.monthly_charges set active_payment_id=null where user_id='${owner}';delete from public.monthly_charge_events where user_id='${owner}';delete from public.monthly_charges where user_id='${owner}';delete from public.rides where user_id='${owner}';delete from public.received_rides where user_id='${owner}';delete from public.passengers where id in ('${passenger}','${passenger2}');delete from public.responsible_accounts where user_id='${owner}';delete from auth.users where id='${owner}';`);}
 try{
  cleanup();sql(`insert into auth.users(id,email)values('${owner}','finance-race@example.test');insert into public.responsible_accounts(user_id)values('${owner}');insert into public.passengers(id,user_id,name,default_daily_rate)values('${passenger}','${owner}','Synthetic race',10);${auth}insert into public.rides(user_id,passenger_id,ride_date,rate_charged)values('${owner}','${passenger}','2025-01-01',10);`);
  let r=await race('A simultaneous closing',["select public.close_month('2025-01-01')","select public.close_month('2025-01-01')"]);
@@ -61,10 +62,44 @@ try{
  // Administrative fixture leaves a stale total deliberately. Both RPCs must compute persisted data.
  c=state();sql(`update public.rides set rate_charged=20 where user_id='${owner}';`);
  r=await race('C pay versus changed recalculation',[`select public.pay_charge('${c.id}',${c.revision})`,"select public.close_month('2025-01-01')"]);assert.equal(r.filter(x=>x.err.includes('STALE_OBLIGATION')).length,1);assert.equal(state().total_amount,20);assert.equal(state().paid,false);
- assert.equal(r[1].code,0);assert.ok(r[0].err.includes('STALE_OBLIGATION'));audit('C',4,20,false,3,2,1);
+ assert.equal(r[1].code,0);assert.ok(r[0].err.includes('STALE_OBLIGATION'));audit('C',4,20,false,3,2,1,10,true);
  r=await race('D ledger edit versus recalculation',[`update public.rides set rate_charged=30 where user_id='${owner}'`,"select public.close_month('2025-01-01')"]);assert.equal(state().total_amount,30);assert.equal(state().paid,false);
- assert.equal(r.filter(x=>x.code===0).length,2);audit('D',5,30,false,3,2,1);
+ assert.equal(r.filter(x=>x.code===0).length,2);audit('D',5,30,false,3,2,1,10,true);
  c=state();sql(`${auth}select public.pay_charge('${c.id}',${c.revision});`);const current=state();
  const stale=session(`${auth}select public.cancel_charge_payment('${c.id}','${sql(`select id from public.monthly_charge_events where user_id='${owner}' and kind='PAYMENT' order by occurred_at limit 1`)}');`);assert.ok((await stale.done).err.includes('STALE_OBLIGATION'));assert.equal(state().active_payment_id,current.active_payment_id);
+ // H e I: fechamento por ciclo (0013). Segundo passageiro, datas fixas de 2025.
+ sql(`insert into public.passengers(id,user_id,name,default_daily_rate)values('${passenger2}','${owner}','Synthetic race 2',10);${auth}insert into public.rides(user_id,passenger_id,ride_date,rate_charged)values('${owner}','${passenger2}','2025-02-10',10);`);
+ const cyclesOf=()=>JSON.parse(sql(`select coalesce(json_agg(c order by period_start),'[]'::json) from public.monthly_charges c where passenger_id='${passenger2}'`));
+ r=await race('H close_cycle versus close_cycle',["select * from public.close_cycle('2025-02-28')","select * from public.close_cycle('2025-02-28')"],['INVALID_CYCLE_END']);
+ let cycles=cyclesOf();assert.equal(cycles.length,1,'H: duplicated cycle');assert.equal(cycles[0].period_start,'2025-02-10');assert.equal(cycles[0].period_end,'2025-02-28');assert.equal(cycles[0].total_amount,10);
+ assert.equal(cycles[0].reference_month,cycles[0].period_start);
+ // Saída do psql (-qAt): colunas separadas por '|' na ordem de close_cycle (passenger_id, status, reason, charge_id, period_start, period_end, total_amount).
+ const rowsOf=x=>x.out.split('\n').map(l=>l.split('|')).filter(f=>f.length===7&&f[0]===passenger2);
+ const mine=r.map(rowsOf);assert.ok(mine.every(m=>m.length===1),'H: each session must return exactly one row for passenger 2');
+ const rows=mine.map(m=>m[0]),closed=rows.filter(f=>f[1]==='CLOSED'),skipped=rows.filter(f=>f[1]==='SKIPPED');
+ assert.equal(closed.length,1,'H: exactly one session must close the cycle');assert.equal(skipped.length,1,'H: exactly one session must be skipped');
+ assert.equal(closed[0][3],cycles[0].id,'H: CLOSED must point to the stored cycle');assert.equal(closed[0][4],'2025-02-10');assert.equal(closed[0][5],'2025-02-28');assert.equal(Number(closed[0][6]),10);
+ assert.equal(skipped[0][2],'ALREADY_CLOSED_UNTIL');assert.equal(skipped[0][3],'','H: SKIPPED must not create a charge');assert.equal(skipped[0][5],'2025-02-28','H: SKIPPED must report the end of the last cycle');
+ assert.equal(Number(sql(`select count(*) from public.monthly_charges a join public.monthly_charges b on a.passenger_id=b.passenger_id and a.id<b.id and daterange(a.period_start,a.period_end,'[]')&&daterange(b.period_start,b.period_end,'[]') where a.passenger_id='${passenger2}'`)),0,'H: overlapping cycles');
+ r=await race('I close_cycle versus ride insert',["select * from public.close_cycle('2025-03-31')",`insert into public.rides(user_id,passenger_id,ride_date,rate_charged)values('${owner}','${passenger2}','2025-03-10',10)`],['INVALID_CYCLE_END']);
+ assert.equal(r[1].code,0,'I: the ride insert must succeed');
+ // A ordem das sessões não é travada: o insert pode entrar antes ou depois do close_cycle.
+ cycles=cyclesOf();const newRide=`select count(*) from public.rides where passenger_id='${passenger2}' and ride_date='2025-03-10'`;assert.equal(sql(newRide),'1','I: ride missing');
+ const insideAny=cycles.filter(x=>x.period_start<='2025-03-10'&&'2025-03-10'<=x.period_end);
+ if(cycles.length===2){
+  console.log('I order: insert first');
+  assert.equal(cycles[1].period_start,'2025-03-01');assert.equal(cycles[1].period_end,'2025-03-31');
+  assert.equal(insideAny.length,1,'I: new ride must be inside exactly one cycle');assert.equal(insideAny[0].id,cycles[1].id);
+  assert.equal(Number(sql(`select count(*) from public.rides where passenger_id='${passenger2}' and ride_date between '2025-03-01' and '2025-03-31'`)),1,'I: new cycle must hold exactly the inserted ride');
+  assert.equal(cycles[1].total_amount,10,'I: new cycle total must be the inserted ride');
+ } else {
+  console.log('I order: close first');
+  assert.equal(cycles.length,1,'I: duplicated or missing cycle');
+  assert.equal(insideAny.length,0,'I: new ride must stay outside every closed cycle');
+  assert.ok(cycles.every(x=>Number(x.total_amount)!==0),'I: zeroed charge created');
+ }
+ assert.equal(new Set(cycles.map(x=>x.period_start)).size,cycles.length,'I: duplicated cycle');
+ assert.equal(Number(sql(`select count(*) from public.monthly_charges a join public.monthly_charges b on a.passenger_id=b.passenger_id and a.id<b.id and daterange(a.period_start,a.period_end,'[]')&&daterange(b.period_start,b.period_end,'[]') where a.passenger_id='${passenger2}'`)),0,'I: overlapping cycles');
+ console.log('H/I close_cycle races: no deadlock, no duplicated or overlapping cycle');
  console.log('LOCAL financial concurrency PASS: A–G, final states and stale cancellation verified.');
 }finally{for(const child of children)if(child.exitCode===null)child.kill();cleanup();}

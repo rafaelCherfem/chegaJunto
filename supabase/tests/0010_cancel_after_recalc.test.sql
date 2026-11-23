@@ -13,6 +13,12 @@ create function pg_temp.event_time(event_id uuid) returns timestamptz language s
 create temporary table snapshots(label text primary key,event_id uuid);
 grant select,insert on snapshots to authenticated;
 
+-- Diária de abril do cenário A. Fica aqui, antes dos fixtures legados, porque o
+-- passageiro ainda não tem nenhum ciclo: depois deles o primeiro ciclo já começa em
+-- junho e uma diária de 1/abr seria rejeitada por ser anterior ao primeiro fechamento.
+insert into public.rides(user_id,passenger_id,ride_date,rate_charged)
+values('a1000000-0000-0000-0000-000000000001','a2000000-0000-0000-0000-000000000001','2025-04-01',15);
+
 -- Histórico legado montado direto nas tabelas, como ficou em produção. O REOPEN
 -- da regra antiga (0008) zerou paid_amount; os REOPEN seguintes são da 0009.
 -- Junho: P15 r1, REOPEN r1, P12 r3, REOPEN r3, P15 r4, REOPEN r4. Total 12, recebido 27.
@@ -97,8 +103,6 @@ select throws_ok($$select public.cancel_charge_payment('a3000000-0000-0000-0000-
 select is((pg_temp.c('2025-08-01')).paid_amount,5::numeric,'august: nothing written');
 
 -- Cenário A: pagar, recalcular para baixo (saldo a devolver) e desfazer em cadeia.
-insert into public.rides(user_id,passenger_id,ride_date,rate_charged)
-values(auth.uid(),'a2000000-0000-0000-0000-000000000001','2025-04-01',15);
 select lives_ok($$select public.close_month('2025-04-01')$$,'april: close with one ride');
 select ok((public.pay_charge((pg_temp.c('2025-04-01')).id,(pg_temp.c('2025-04-01')).revision)).paid,'april: pay 15');
 insert into snapshots select 'april-first',(pg_temp.c('2025-04-01')).active_payment_id;

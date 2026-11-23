@@ -1,6 +1,13 @@
 import { requestSignal, type SessionScope } from "@/lib/sessionScope";
-import { assertRecordDate, FUTURE_DATE_ERROR, monthBounds } from "@/utils/date";
+import {
+  assertPeriod,
+  assertRecordDate,
+  FUTURE_DATE_ERROR,
+  monthBounds,
+} from "@/utils/date";
 import { errorMessages } from "@/constants/errorMessages";
+import { loadErrorFrom } from "@/lib/loadErrors";
+import { mapCycleError } from "@/lib/cycleErrors";
 import { toRide } from "@/lib/mappers";
 import { getCurrentUserId, supabase } from "@/lib/supabase";
 import { getPassenger } from "@/services/passengers.service";
@@ -40,6 +47,35 @@ export async function listRidesByMonth(
   return data.map(toRide);
 }
 
+// Diárias entre duas datas, ambas inclusivas (ciclo da cobrança).
+export async function listRidesByPeriod(
+  periodStart: string,
+  periodEnd: string,
+  passengerId?: string,
+  scope?: SessionScope,
+): Promise<Ride[]> {
+  assertPeriod(periodStart, periodEnd);
+
+  let query = supabase
+    .from("rides")
+    .select("*")
+    .gte("ride_date", periodStart)
+    .lte("ride_date", periodEnd)
+    .order("ride_date");
+
+  if (passengerId) {
+    query = query.eq("passenger_id", passengerId);
+  }
+
+  const { data, error } = await query.abortSignal(requestSignal(scope));
+
+  if (error) {
+    throw loadErrorFrom(error);
+  }
+
+  return data.map(toRide);
+}
+
 export async function createRide(
   input: CreateRideInput,
   scope?: SessionScope,
@@ -67,7 +103,7 @@ export async function createRide(
     if (error.code === UNIQUE_VIOLATION) {
       throw new Error(errorMessages.duplicateRide);
     }
-    throw new Error(errorMessages.unexpected);
+    throw mapCycleError(error) ?? new Error(errorMessages.unexpected);
   }
 
   return toRide(data);

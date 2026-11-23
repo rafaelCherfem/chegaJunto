@@ -48,11 +48,32 @@ export interface MonthlyCharge {
   id: string;
   passengerId: string;
   referenceMonth: string;
+  /** Primeiro e último dia do ciclo, ambos inclusivos (referenceMonth é sempre igual a periodStart). */
+  periodStart: string;
+  periodEnd: string;
   totalAmount: number;
   paid: boolean;
   paidAmount: number;
   paidAt: string | null;
   createdAt: string;
+}
+
+export type CycleStatus = "CLOSED" | "SKIPPED" | "NO_MOVEMENT";
+
+/** Uma linha do resumo de close_cycle e preview_cycle (um passageiro). */
+export interface CycleSummaryRow {
+  passengerId: string;
+  status: CycleStatus;
+  /** ALREADY_CLOSED_UNTIL quando SKIPPED. */
+  reason: string | null;
+  /** Só vem em close_cycle, e só quando CLOSED. */
+  chargeId: string | null;
+  /** Nulo em SKIPPED. */
+  periodStart: string | null;
+  /** Em SKIPPED, o fim do último ciclo do passageiro; nos demais, a data escolhida. */
+  periodEnd: string | null;
+  /** Só em CLOSED. */
+  totalAmount: number | null;
 }
 
 export interface ChargePaymentEvent {

@@ -1,25 +1,23 @@
 import { usePrivateMutation } from "@/hooks/usePrivateQuery";
 import { generateMonthlyReceipt } from "@/services/pdf.service";
-import { listReceivedRidesByMonth } from "@/services/receivedRides.service";
-import { listRidesByMonth } from "@/services/rides.service";
+import { listReceivedRidesByPeriod } from "@/services/receivedRides.service";
+import { listRidesByPeriod } from "@/services/rides.service";
 import { downloadFile } from "@/utils/downloadFile";
 import type { MonthlyCharge, Passenger } from "@/types/entities";
 
 interface GenerateReceiptInput {
   passenger: Passenger;
   charge: MonthlyCharge;
-  referenceMonth: string;
 }
 
 export function useGenerateReceipt() {
   return usePrivateMutation({
-    mutationFn: async (
-      { passenger, charge, referenceMonth }: GenerateReceiptInput,
-      scope,
-    ) => {
+    mutationFn: async ({ passenger, charge }: GenerateReceiptInput, scope) => {
+      // O comprovante cobre o período da própria cobrança, não o mês de calendário.
+      const { periodStart, periodEnd } = charge;
       const [rides, receivedRides] = await Promise.all([
-        listRidesByMonth(referenceMonth, passenger.id, scope),
-        listReceivedRidesByMonth(referenceMonth, passenger.id, scope),
+        listRidesByPeriod(periodStart, periodEnd, passenger.id, scope),
+        listReceivedRidesByPeriod(periodStart, periodEnd, passenger.id, scope),
       ]);
       scope.assertCurrent();
       const bytes = await generateMonthlyReceipt({
@@ -27,12 +25,17 @@ export function useGenerateReceipt() {
         charge,
         rides,
         receivedRides,
-        referenceMonth,
+        periodStart,
+        periodEnd,
       });
 
       scope.assertCurrent();
       const slug = passenger.name.trim().toLowerCase().replace(/\s+/g, "-");
-      downloadFile(bytes, `comprovante-${slug}-${referenceMonth}.pdf`, "application/pdf");
+      downloadFile(
+        bytes,
+        `comprovante-${slug}-${periodStart}_a_${periodEnd}.pdf`,
+        "application/pdf",
+      );
     },
   });
 }

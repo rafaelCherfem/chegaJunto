@@ -49,10 +49,12 @@ vi.mock("@/services/passengers.service", () => ({
 }));
 vi.mock("@/services/rides.service", () => ({
   listRidesByMonth: mocks.list,
+  listRidesByPeriod: mocks.list,
   createRide: mocks.create,
 }));
 vi.mock("@/services/receivedRides.service", () => ({
   listReceivedRidesByMonth: mocks.list,
+  listReceivedRidesByPeriod: mocks.list,
 }));
 vi.mock("@/services/monthlyCharges.service", () => ({ listMonthlyCharges: mocks.list }));
 vi.mock("@/services/rideFlags.service", () => ({ listUnresolvedFlags: mocks.list }));
@@ -386,13 +388,14 @@ describe("session regression — actual Auth events and React Query", () => {
                 id: "C",
                 passengerId: "P",
                 referenceMonth: "2025-01-01",
+                periodStart: "2025-01-01",
+                periodEnd: "2025-01-31",
                 revision: 1, activePaymentId: "payment", totalAmount: 10,
                 paid: true,
                 paidAmount: 10,
                 paidAt: "",
                 createdAt: "",
               },
-              referenceMonth: "2025-01-01",
             })
           }
         >

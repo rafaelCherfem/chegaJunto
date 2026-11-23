@@ -1,12 +1,7 @@
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import { formatCurrency } from "@/utils/currency";
 import { debtLabel, toCents } from "@/utils/money";
-import {
-  formatDateDisplay,
-  formatMonthLabel,
-  isoDateFromTimestamp,
-  todayISODate,
-} from "@/utils/date";
+import { formatDateDisplay, isoDateFromTimestamp, todayISODate } from "@/utils/date";
 import type { MonthlyCharge, Passenger, ReceivedRide, Ride } from "@/types/entities";
 
 interface ReceiptData {
@@ -14,7 +9,9 @@ interface ReceiptData {
   charge: MonthlyCharge;
   rides: Ride[];
   receivedRides: ReceivedRide[];
-  referenceMonth: string;
+  /** Primeiro e último dia do ciclo da cobrança, ambos inclusivos (AAAA-MM-DD). */
+  periodStart: string;
+  periodEnd: string;
 }
 
 export interface ReceiptLine {
@@ -82,13 +79,13 @@ function receiptSituation(charge: MonthlyCharge): ReceiptLine[] {
 }
 
 export function buildReceiptLines(
-  { passenger, charge, rides, receivedRides, referenceMonth }: ReceiptData,
+  { passenger, charge, rides, receivedRides, periodStart, periodEnd }: ReceiptData,
   generatedOn = todayISODate(),
 ): ReceiptLine[] {
   const lines: ReceiptLine[] = [
     { text: "chegaJunto", size: 20, bold: true },
     {
-      text: `Comprovante de diárias — ${formatMonthLabel(referenceMonth)}`,
+      text: `Comprovante de diárias — ${formatDateDisplay(periodStart)} a ${formatDateDisplay(periodEnd)}`,
       size: 12,
       gray: true,
     },
@@ -98,7 +95,7 @@ export function buildReceiptLines(
 
   const sortedRides = [...rides].sort(byDate((ride) => ride.rideDate));
   if (sortedRides.length === 0) {
-    lines.push({ text: "Nenhuma diária registrada nesta competência.", gray: true });
+    lines.push({ text: "Nenhuma diária registrada neste período.", gray: true });
   }
   for (const ride of sortedRides) {
     lines.push({
@@ -129,7 +126,7 @@ export function buildReceiptLines(
   }
 
   lines.push({
-    text: `Total do mês: ${formatCurrency(charge.totalAmount)}`,
+    text: `Total do período: ${formatCurrency(charge.totalAmount)}`,
     bold: true,
     size: 14,
     spaceBefore: compensationCents > 0 ? 4 : 8,

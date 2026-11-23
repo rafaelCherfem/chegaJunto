@@ -84,7 +84,7 @@ export function ChargeSheet({ monthLabel, open, onOpenChange, ...props }: Charge
             </div>
           )}
           <div>
-            <dt>Total do mês</dt>
+            <dt>Total do período</dt>
             <dd>{formatCurrency(props.amount)}</dd>
           </div>
           {returnedCents > 0 && (
