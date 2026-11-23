@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toCents } from "@/utils/money";
 import { ChargeSheet } from "@/components/charges/ChargeSheet";
+import { CloseCycleSheet } from "@/components/charges/CloseCycleSheet";
 import {
   MonthlyChargeCard,
   type MonthlyChargeCardProps,
@@ -22,6 +23,7 @@ import { latestOpenPayment } from "@/utils/chargePayments";
 import { pendingCents } from "@/utils/chargeState";
 import {
   buildOpenCycle,
+  closeCycleMinDate,
   groupChargesByPeriodEnd,
   neverClosedPassengerIds,
   OPEN_CYCLE_KEY,
@@ -112,6 +114,7 @@ export function MonthlyClosingPage() {
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [selected, setSelected] = useState<{ id: string; key: string } | null>(null);
+  const [closeSheetOpen, setCloseSheetOpen] = useState(false);
   // O sheet pertence ao ciclo em que foi aberto: trocar de ciclo o fecha.
   const selectedId = selected?.key === activeKey ? selected.id : null;
 
@@ -186,6 +189,22 @@ export function MonthlyClosingPage() {
     () => new Map(items.map((item) => [item.passengerId, item])),
     [items],
   );
+
+  // O mínimo só vale com o movimento do ciclo em aberto carregado (é ele que diz se alguém nunca fechou).
+  const closeMinDate = useMemo(() => {
+    if (!charges || !rides || !receivedRides || selectedGroup) return undefined;
+    const movementIds = new Set([
+      ...rides.map((ride) => ride.passengerId),
+      ...receivedRides.map((received) => received.passengerId),
+    ]);
+    return closeCycleMinDate(charges, movementIds, today);
+  }, [charges, rides, receivedRides, selectedGroup, today]);
+
+  function openCloseSheet() {
+    // O seletor parte do ciclo em aberto, que é o que o movimento carregado descreve.
+    setSelectedKey(OPEN_CYCLE_KEY);
+    setCloseSheetOpen(true);
+  }
 
   async function handleMarkPaid(chargeId: string, revision: number) {
     setActionError(null);
@@ -334,14 +353,7 @@ export function MonthlyClosingPage() {
         </Button>
       </div>
 
-      <div className="space-y-1.5">
-        <Button disabled aria-describedby="calculate-hint">
-          Calcular fechamento
-        </Button>
-        <p id="calculate-hint" className="text-sm text-muted-foreground">
-          O fechamento por data chega na próxima etapa
-        </p>
-      </div>
+      <Button onClick={openCloseSheet}>Calcular fechamento</Button>
 
       {actionError && (
         <p role="alert" className="text-sm text-destructive">
@@ -394,6 +406,19 @@ export function MonthlyClosingPage() {
           <MonthlyChargeCard key={item.passengerId} {...chargeProps(item)} />
         ))}
       </div>
+
+      {closeSheetOpen && (
+        <CloseCycleSheet
+          today={today}
+          minDate={closeMinDate}
+          nameOf={(id) => passengersById.get(id)?.name ?? "Passageiro"}
+          onClosed={(rows, endDate) => {
+            // O ciclo criado termina na data escolhida; os dados novos chegam com a invalidação.
+            setSelectedKey(rows.find((row) => row.status === "CLOSED")?.periodEnd ?? endDate);
+          }}
+          onDismiss={() => setCloseSheetOpen(false)}
+        />
+      )}
 
       {selectedItem && (
         <ChargeSheet

@@ -62,6 +62,26 @@ export function neverClosedPassengerIds(
   return passengerIds.filter((id) => !closed.has(id));
 }
 
+/**
+ * Menor data final sugerida no seletor de fechamento: o dia seguinte ao menor fim entre os
+ * últimos ciclos dos passageiros. Sem mínimo quando alguém com movimento nunca fechou (o ciclo
+ * dele começa na primeira diária) ou quando ninguém fechou ainda. Nunca passa de hoje.
+ * É só conveniência: quem decide o que fecha é a prévia do banco.
+ */
+export function closeCycleMinDate(
+  charges: ReadonlyArray<MonthlyCharge>,
+  movementPassengerIds: Iterable<string>,
+  today: string,
+): string | undefined {
+  const closed = new Set(charges.map((charge) => charge.passengerId));
+  for (const id of movementPassengerIds) {
+    if (!closed.has(id)) return undefined;
+  }
+  const lookback = openCycleLookback(charges);
+  if (lookback === null) return undefined;
+  return lookback > today ? today : lookback;
+}
+
 export interface PeriodTotals {
   rideCents: number;
   compensationCents: number;

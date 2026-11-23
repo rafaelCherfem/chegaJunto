@@ -15,6 +15,8 @@ vi.mock("@/hooks/useMonthlyCharges", () => ({
   usePaymentEventsForCharges: mocks.events,
   useMarkMonthlyChargePaid: () => ({ mutateAsync: mocks.pay }),
   useUnmarkMonthlyChargePaid: () => ({ mutateAsync: vi.fn() }),
+  usePreviewCycle: () => ({ mutateAsync: vi.fn().mockResolvedValue([]) }),
+  useCloseCycle: () => ({ mutateAsync: vi.fn() }),
 }));
 vi.mock("@/hooks/usePassengers", () => ({ usePassengers: mocks.passengers }));
 vi.mock("@/hooks/useRides", () => ({ useRidesByPeriod: mocks.rides }));
@@ -283,13 +285,14 @@ describe("'Em aberto em outros ciclos'", () => {
   });
 });
 
-describe("the calculate button waits for the next stage", () => {
-  it("is visible, disabled and explains why", () => {
+describe("the calculate button", () => {
+  it("is visible and enabled, and opening the confirmation pays nothing", async () => {
     render(<MonthlyClosingPage />);
     const button = screen.getByRole("button", { name: "Calcular fechamento" }) as HTMLButtonElement;
-    expect(button.disabled).toBe(true);
-    expect(screen.getByText("O fechamento por data chega na próxima etapa")).toBeTruthy();
+    expect(button.disabled).toBe(false);
+    expect(screen.queryByText("O fechamento por data chega na próxima etapa")).toBeNull();
     fireEvent.click(button);
+    expect(await screen.findByRole("dialog")).toBeTruthy();
     expect(mocks.pay).not.toHaveBeenCalled();
   });
 });
