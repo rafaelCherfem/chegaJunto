@@ -1,6 +1,6 @@
 import { MonthHero } from "@/components/charges/MonthHero";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toCents } from "@/utils/money";
 import { ChargeSheet } from "@/components/charges/ChargeSheet";
 import { CloseCycleSheet } from "@/components/charges/CloseCycleSheet";
@@ -25,9 +25,11 @@ import {
   buildOpenCycle,
   closeCycleMinDate,
   groupChargesByPeriodEnd,
+  hasNoOpenCycle,
+  latestClosedEnd,
   neverClosedPassengerIds,
   OPEN_CYCLE_KEY,
-  openCycleLookback,
+  openCycleStart,
   periodTotals,
   type PeriodTotals,
 } from "@/utils/cycles";
@@ -37,6 +39,7 @@ import {
   formatPeriodLabel,
   todayISODate,
 } from "@/utils/date";
+import { loadErrorKind, loadErrorMessages, reportLoadError } from "@/lib/loadErrors";
 import type { MonthlyCharge, Passenger } from "@/types/entities";
 
 function amountsMatch(a: number, b: number): boolean {
@@ -61,16 +64,37 @@ export function MonthlyClosingPage() {
     data: charges,
     isLoading: loadingCharges,
     isError: chargesError,
+    error: chargesFailure,
   } = useCycleCharges();
   const chargeIds = useMemo(() => (charges ?? []).map((charge) => charge.id), [charges]);
   const { data: paymentEvents } = usePaymentEventsForCharges(chargeIds);
 
   const groups = useMemo(() => groupChargesByPeriodEnd(charges ?? []), [charges]);
   // Do mais recente ao mais antigo: o ciclo em aberto, depois os fechados.
-  const keys = useMemo(() => [OPEN_CYCLE_KEY, ...groups.map((g) => g.periodEnd)], [groups]);
+  // Quando todos os passageiros já fecharam até hoje (ou depois), não existe ciclo em aberto:
+  // a lista começa no ciclo fechado mais recente.
+  const noOpenCycle = useMemo(
+    () =>
+      charges !== undefined &&
+      passengers !== undefined &&
+      hasNoOpenCycle(
+        charges,
+        neverClosedPassengerIds(
+          passengers.map((passenger) => passenger.id),
+          charges,
+        ),
+        today,
+      ),
+    [charges, passengers, today],
+  );
+  const keys = useMemo(
+    () => (noOpenCycle ? groups.map((g) => g.periodEnd) : [OPEN_CYCLE_KEY, ...groups.map((g) => g.periodEnd)]),
+    [groups, noOpenCycle],
+  );
   const index = Math.max(0, keys.indexOf(selectedKey));
   const activeKey = keys[index]!;
-  const selectedGroup = index === 0 ? null : (groups[index - 1] ?? null);
+  const selectedGroup = noOpenCycle ? (groups[index] ?? null) : index === 0 ? null : (groups[index - 1] ?? null);
+  const lastClosing = charges ? latestClosedEnd(charges) : null;
 
   // Uma faixa só de diárias e compensações. Ciclo fechado: do menor início ao fim. Ciclo em
   // aberto: do menor "fim do último ciclo + 1" até hoje, mais o histórico de quem nunca fechou.
@@ -81,7 +105,8 @@ export function MonthlyClosingPage() {
     }
     if (!passengers) return null;
     return {
-      start: openCycleLookback(charges),
+      // Início depois de hoje não é faixa: ninguém tem movimento em aberto entre os fechados.
+      start: openCycleStart(charges, today),
       end: today,
       extra: neverClosedPassengerIds(
         passengers.map((passenger) => passenger.id),
@@ -94,11 +119,13 @@ export function MonthlyClosingPage() {
     data: rides,
     isLoading: loadingRides,
     isError: ridesError,
+    error: ridesFailure,
   } = useRidesByPeriod(range?.start ?? null, range?.end ?? today, range?.extra ?? [], range !== null);
   const {
     data: receivedRides,
     isLoading: loadingReceived,
     isError: receivedError,
+    error: receivedFailure,
   } = useReceivedRidesByPeriod(
     range?.start ?? null,
     range?.end ?? today,
@@ -319,6 +346,17 @@ export function MonthlyClosingPage() {
       : `${formatDateDisplay(item.start)} a hoje`;
   }
 
+  const failures = [
+    chargesError ? { label: "cobranças", error: chargesFailure } : null,
+    ridesError ? { label: "diárias", error: ridesFailure } : null,
+    receivedError ? { label: "compensações", error: receivedFailure } : null,
+  ].filter((failure) => failure !== null);
+  useEffect(() => {
+    if (chargesError) reportLoadError("Cobranças: consulta de cobranças", chargesFailure);
+    if (ridesError) reportLoadError("Cobranças: consulta de diárias", ridesFailure);
+    if (receivedError) reportLoadError("Cobranças: consulta de compensações", receivedFailure);
+  }, [chargesError, chargesFailure, ridesError, ridesFailure, receivedError, receivedFailure]);
+
   const loading = loadingCharges || loadingRides || loadingReceived;
   const ready = !loading && !chargesError && !ridesError && !receivedError && charges && rides && receivedRides;
   const selectedItem = selectedId ? itemsByPassenger.get(selectedId) : undefined;
@@ -353,7 +391,21 @@ export function MonthlyClosingPage() {
         </Button>
       </div>
 
-      <Button onClick={openCloseSheet}>Calcular fechamento</Button>
+      {noOpenCycle && lastClosing && (
+        <p role="status" className="text-sm text-muted-foreground">
+          Sem ciclo em aberto: o último fechamento vai até {formatDateDisplay(lastClosing)}
+        </p>
+      )}
+
+      <Button onClick={openCloseSheet} disabled={noOpenCycle}>
+        Calcular fechamento
+      </Button>
+      {noOpenCycle && lastClosing && (
+        <p className="text-sm text-muted-foreground">
+          Todos os passageiros já estão fechados até {formatDateDisplay(lastClosing)}. Para fechar
+          de novo, é preciso haver movimento novo.
+        </p>
+      )}
 
       {actionError && (
         <p role="alert" className="text-sm text-destructive">
@@ -367,10 +419,18 @@ export function MonthlyClosingPage() {
         </p>
       )}
 
-      {(chargesError || ridesError || receivedError) && (
-        <p role="alert" className="text-sm text-destructive">
-          Não foi possível carregar os ciclos de cobrança.
-        </p>
+      {failures.length > 0 && (
+        <div role="alert" className="space-y-1 text-sm text-destructive">
+          <p>
+            Não foi possível carregar os ciclos de cobrança.{" "}
+            {
+              loadErrorMessages[
+                failures.some((failure) => loadErrorKind(failure.error) === "network") ? "network" : "data"
+              ]
+            }
+          </p>
+          <p>Consulta com falha: {failures.map((failure) => failure.label).join(", ")}.</p>
+        </div>
       )}
 
       {ready && items.length === 0 && (

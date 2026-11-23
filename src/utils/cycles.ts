@@ -53,6 +53,37 @@ export function openCycleLookback(charges: ReadonlyArray<MonthlyCharge>): string
   return lookback;
 }
 
+/** O maior fim de ciclo entre todos os passageiros, ou null se ninguém fechou. */
+export function latestClosedEnd(charges: ReadonlyArray<MonthlyCharge>): string | null {
+  let latest: string | null = null;
+  for (const end of lastClosedEnds(charges).values()) {
+    if (latest === null || end > latest) latest = end;
+  }
+  return latest;
+}
+
+/**
+ * Início da faixa do ciclo em aberto, ou null quando ela não existe: ninguém fechou ainda, ou
+ * todos já fecharam até hoje ou depois (o início seria depois de hoje, uma faixa invertida).
+ */
+export function openCycleStart(charges: ReadonlyArray<MonthlyCharge>, today: string): string | null {
+  const lookback = openCycleLookback(charges);
+  return lookback !== null && lookback > today ? null : lookback;
+}
+
+/**
+ * Não há ciclo em aberto quando alguém já fechou, todos que fecharam estão fechados até hoje ou
+ * depois e nenhum passageiro sem cobrança ainda pode ter movimento a mostrar.
+ */
+export function hasNoOpenCycle(
+  charges: ReadonlyArray<MonthlyCharge>,
+  neverClosedIds: ReadonlyArray<string>,
+  today: string,
+): boolean {
+  const lookback = openCycleLookback(charges);
+  return lookback !== null && lookback > today && neverClosedIds.length === 0;
+}
+
 /** Passageiros que ainda não têm nenhuma cobrança: o ciclo deles começa na primeira diária. */
 export function neverClosedPassengerIds(
   passengerIds: ReadonlyArray<string>,

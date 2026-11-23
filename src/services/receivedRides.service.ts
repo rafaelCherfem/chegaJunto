@@ -7,6 +7,7 @@ import {
 } from "@/utils/date";
 import { toCents } from "@/utils/money";
 import { errorMessages } from "@/constants/errorMessages";
+import { loadErrorFrom } from "@/lib/loadErrors";
 import { mapCycleError } from "@/lib/cycleErrors";
 import { toReceivedRide } from "@/lib/mappers";
 import { getCurrentUserId, supabase } from "@/lib/supabase";
@@ -68,7 +69,7 @@ export async function listReceivedRidesByPeriod(
   const { data, error } = await query.abortSignal(requestSignal(scope));
 
   if (error) {
-    throw new Error(errorMessages.unexpected);
+    throw loadErrorFrom(error);
   }
 
   return data.map(toReceivedRide);

@@ -6,6 +6,7 @@ import {
   monthBounds,
 } from "@/utils/date";
 import { errorMessages } from "@/constants/errorMessages";
+import { loadErrorFrom } from "@/lib/loadErrors";
 import { mapCycleError } from "@/lib/cycleErrors";
 import { toRide } from "@/lib/mappers";
 import { getCurrentUserId, supabase } from "@/lib/supabase";
@@ -69,7 +70,7 @@ export async function listRidesByPeriod(
   const { data, error } = await query.abortSignal(requestSignal(scope));
 
   if (error) {
-    throw new Error(errorMessages.unexpected);
+    throw loadErrorFrom(error);
   }
 
   return data.map(toRide);

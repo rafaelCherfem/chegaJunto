@@ -1,6 +1,7 @@
 import { assertCalendarDate, assertReferenceMonth } from "@/utils/date";
 import { requestSignal, type SessionScope } from "@/lib/sessionScope";
 import { errorMessages } from "@/constants/errorMessages";
+import { loadErrorFrom } from "@/lib/loadErrors";
 import { mapCycleError } from "@/lib/cycleErrors";
 import { toChargePaymentEvent, toCycleSummaryRow, toMonthlyCharge } from "@/lib/mappers";
 import { supabase } from "@/lib/supabase";
@@ -34,7 +35,7 @@ export async function listCycleCharges(scope?: SessionScope): Promise<MonthlyCha
   const signal = requestSignal(scope);
   const { data, error } = await supabase.from("monthly_charges").select("*").order("period_end", { ascending: false }).order("period_start", { ascending: false }).abortSignal(signal);
   scope?.assertCurrent();
-  if (error) throw new Error(errorMessages.unexpected);
+  if (error) throw loadErrorFrom(error);
   return data.map(toMonthlyCharge);
 }
 // Eventos de pagamento das cobranças dadas (por id, não por mês de referência).
