@@ -73,8 +73,8 @@ try{
  r=await race('H close_cycle versus close_cycle',["select * from public.close_cycle('2025-02-28')","select * from public.close_cycle('2025-02-28')"],['INVALID_CYCLE_END']);
  let cycles=cyclesOf();assert.equal(cycles.length,1,'H: duplicated cycle');assert.equal(cycles[0].period_start,'2025-02-10');assert.equal(cycles[0].period_end,'2025-02-28');assert.equal(cycles[0].total_amount,10);
  assert.equal(cycles[0].reference_month,cycles[0].period_start);
- // Saída do psql (-qAt): colunas separadas por '|' na ordem de close_cycle (passenger_id, status, reason, charge_id, period_start, period_end, total_amount).
- const rowsOf=x=>x.out.split('\n').map(l=>l.split('|')).filter(f=>f.length===7&&f[0]===passenger2);
+ // Saída do psql (-qAt): colunas separadas por '|' na ordem de close_cycle (passenger_id, status, reason, charge_id, period_start, period_end, total_amount, paid_amount, amount_due, refund_due).
+ const rowsOf=x=>x.out.split('\n').map(l=>l.split('|')).filter(f=>f.length===10&&f[0]===passenger2);
  const mine=r.map(rowsOf);assert.ok(mine.every(m=>m.length===1),'H: each session must return exactly one row for passenger 2');
  const rows=mine.map(m=>m[0]),closed=rows.filter(f=>f[1]==='CLOSED'),skipped=rows.filter(f=>f[1]==='SKIPPED');
  assert.equal(closed.length,1,'H: exactly one session must close the cycle');assert.equal(skipped.length,1,'H: exactly one session must be skipped');
