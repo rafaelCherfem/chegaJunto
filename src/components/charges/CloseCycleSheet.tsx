@@ -36,13 +36,29 @@ interface CycleSummaryProps {
   rows: CycleSummaryRow[];
   endDate: string;
   verb: "Fechar" | "Ciclo fechado";
+  /** Para quem tem ciclo em aberto: o texto por extenso do encerramento. */
+  extendedVerb: "Encerrar o ciclo" | "Ciclo encerrado";
   nameOf: (passengerId: string) => string;
 }
 
-function CycleSummary({ rows, endDate, verb, nameOf }: CycleSummaryProps) {
+// Valores do ciclo em aberto de um passageiro. Num banco sem a migração 0014 os campos vêm nulos;
+// aí o que falta sai de total e pago.
+function extendedAmounts(row: CycleSummaryRow) {
+  const total = row.totalAmount ?? 0;
+  const paid = row.paidAmount ?? 0;
+  return {
+    total,
+    paid,
+    due: row.amountDue ?? Math.max(total - paid, 0),
+    refund: row.refundDue ?? 0,
+  };
+}
+
+function CycleSummary({ rows, endDate, verb, extendedVerb, nameOf }: CycleSummaryProps) {
   const byName = (a: CycleSummaryRow, b: CycleSummaryRow) =>
     nameOf(a.passengerId).localeCompare(nameOf(b.passengerId), "pt-BR");
   const closed = rows.filter((row) => row.status === "CLOSED").sort(byName);
+  const extended = rows.filter((row) => row.status === "EXTENDED").sort(byName);
   const noMovement = rows.filter((row) => row.status === "NO_MOVEMENT").sort(byName);
   const skippedByEnd = new Map<string, CycleSummaryRow[]>();
   for (const row of rows.filter((item) => item.status === "SKIPPED").sort(byName)) {
@@ -50,13 +66,59 @@ function CycleSummary({ rows, endDate, verb, nameOf }: CycleSummaryProps) {
     skippedByEnd.set(end, [...(skippedByEnd.get(end) ?? []), row]);
   }
 
-  const start = closed.reduce<string | null>(
-    (min, row) => (row.periodStart && (min === null || row.periodStart < min) ? row.periodStart : min),
-    null,
-  );
+  const earliest = (list: CycleSummaryRow[]) =>
+    list.reduce<string | null>(
+      (min, row) => (row.periodStart && (min === null || row.periodStart < min) ? row.periodStart : min),
+      null,
+    );
+  const start = earliest(closed);
+  const extendedStart = earliest(extended);
 
   return (
     <div className="mt-4 space-y-4">
+      {extended.length > 0 && (
+        <section className="space-y-3">
+          <p className="text-sm font-semibold tabular-nums">
+            {extendedVerb}
+            {extendedStart ? ` de ${formatDateDisplay(extendedStart)}` : ""} até {formatDateDisplay(endDate)} para{" "}
+            {passengersLabel(extended.length)}
+          </p>
+          {extended.map((row) => {
+            const amounts = extendedAmounts(row);
+            return (
+              <div key={row.passengerId}>
+                <p className="text-sm font-medium">{nameOf(row.passengerId)}</p>
+                {row.periodStart && row.periodStart !== extendedStart && (
+                  <p className="text-xs tabular-nums text-muted-foreground">
+                    desde {formatDateDisplay(row.periodStart)}
+                  </p>
+                )}
+                <dl className="sheet__details">
+                  <div>
+                    <dt>Total do ciclo</dt>
+                    <dd>{formatCurrency(amounts.total)}</dd>
+                  </div>
+                  <div>
+                    <dt>Já pago</dt>
+                    <dd>{formatCurrency(amounts.paid)}</dd>
+                  </div>
+                  <div>
+                    <dt>A pagar</dt>
+                    <dd>{formatCurrency(amounts.due)}</dd>
+                  </div>
+                  {amounts.refund > 0 && (
+                    <div>
+                      <dt>Saldo a devolver</dt>
+                      <dd>{formatCurrency(amounts.refund)}</dd>
+                    </div>
+                  )}
+                </dl>
+              </div>
+            );
+          })}
+        </section>
+      )}
+
       {closed.length > 0 ? (
         <>
           <p className="text-sm font-semibold tabular-nums">
@@ -74,9 +136,11 @@ function CycleSummary({ rows, endDate, verb, nameOf }: CycleSummaryProps) {
           </dl>
         </>
       ) : (
-        <p role="status" className="text-sm text-muted-foreground">
-          Nada a fechar neste período
-        </p>
+        extended.length === 0 && (
+          <p role="status" className="text-sm text-muted-foreground">
+            Nada a fechar neste período
+          </p>
+        )
       )}
 
       {Array.from(skippedByEnd, ([end, list]) => (
@@ -142,7 +206,10 @@ export function CloseCycleSheet({ today, minDate, nameOf, onClosed, onDismiss }:
   }, [date]);
 
   const closedRows = useMemo(
-    () => (preview?.date === date && preview.phase === "ready" ? preview.rows : []).filter((row) => row.status === "CLOSED"),
+    () =>
+      (preview?.date === date && preview.phase === "ready" ? preview.rows : []).filter(
+        (row) => row.status === "CLOSED" || row.status === "EXTENDED",
+      ),
     [preview, date],
   );
   const canClose = result === null && !closing && closedRows.length > 0;
@@ -165,6 +232,7 @@ export function CloseCycleSheet({ today, minDate, nameOf, onClosed, onDismiss }:
   }
 
   const current = preview?.date === date ? preview : null;
+  const closedAnyExtended = result?.rows.some((row) => row.status === "EXTENDED") === true;
 
   return (
     <Sheet open onOpenChange={(open) => !open && !closing && onDismiss()}>
@@ -172,7 +240,7 @@ export function CloseCycleSheet({ today, minDate, nameOf, onClosed, onDismiss }:
         <header className="sheet__header pr-12">
           <p className="stat-label">Fechamento</p>
           <SheetTitle className="mt-1.5 text-xl font-extrabold">
-            {result ? "Ciclo fechado" : "Calcular fechamento"}
+            {result ? (closedAnyExtended ? "Ciclo encerrado" : "Ciclo fechado") : "Calcular fechamento"}
           </SheetTitle>
         </header>
 
@@ -183,7 +251,13 @@ export function CloseCycleSheet({ today, minDate, nameOf, onClosed, onDismiss }:
         </SheetDescription>
 
         {result ? (
-          <CycleSummary rows={result.rows} endDate={result.date} verb="Ciclo fechado" nameOf={nameOf} />
+          <CycleSummary
+            rows={result.rows}
+            endDate={result.date}
+            verb="Ciclo fechado"
+            extendedVerb="Ciclo encerrado"
+            nameOf={nameOf}
+          />
         ) : (
           <>
             <div className="mt-4 space-y-1.5">
@@ -215,7 +289,13 @@ export function CloseCycleSheet({ today, minDate, nameOf, onClosed, onDismiss }:
               </p>
             )}
             {current?.phase === "ready" && (
-              <CycleSummary rows={current.rows} endDate={date} verb="Fechar" nameOf={nameOf} />
+              <CycleSummary
+                rows={current.rows}
+                endDate={date}
+                verb="Fechar"
+                extendedVerb="Encerrar o ciclo"
+                nameOf={nameOf}
+              />
             )}
           </>
         )}
@@ -231,7 +311,7 @@ export function CloseCycleSheet({ today, minDate, nameOf, onClosed, onDismiss }:
             <Button onClick={onDismiss}>Concluir</Button>
           ) : (
             <Button disabled={!canClose} aria-busy={closing} onClick={handleClose}>
-              Fechar ciclo
+              Encerrar ciclo
             </Button>
           )}
         </div>

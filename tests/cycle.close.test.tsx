@@ -85,7 +85,7 @@ function setData({ charges = closedCharges, rides = [ride("a-open", "A", "2026-1
 
 const openSheet = () => fireEvent.click(screen.getByRole("button", { name: "Calcular fechamento" }));
 const dateInput = () => screen.getByLabelText("Data final do ciclo") as HTMLInputElement;
-const closeButton = () => screen.getByRole("button", { name: "Fechar ciclo" }) as HTMLButtonElement;
+const closeButton = () => screen.getByRole("button", { name: "Encerrar ciclo" }) as HTMLButtonElement;
 const changeDate = (value: string) => fireEvent.change(dateInput(), { target: { value } });
 
 beforeEach(() => {
@@ -211,7 +211,7 @@ describe("the preview", () => {
   });
 });
 
-describe("the 'Fechar ciclo' button", () => {
+describe("the 'Encerrar ciclo' button", () => {
   it("is disabled until the preview comes back, then enabled", async () => {
     const pending = deferred<CycleSummaryRow[]>();
     mocks.preview.mockReturnValue(pending.promise);

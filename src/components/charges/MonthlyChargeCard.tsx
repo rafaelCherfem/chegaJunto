@@ -16,7 +16,11 @@ export interface MonthlyChargeCardProps {
   compensationAmount: number;
   paid: boolean;
   paidAmount?: number;
+  /** Cobrança de ciclo em aberto (extensível): o total é vivo e "pago" vale só até agora. */
+  cycleOpen?: boolean | undefined;
   canUnmarkPaid?: boolean;
+  /** Valor do pagamento que o "Desfazer" cancela (o vigente mais recente). */
+  undoAmount?: number | undefined;
   toggling: boolean;
   generatingReceipt: boolean;
   /** "desde 05/11": o passageiro começou depois do início do ciclo mostrado. */
@@ -62,11 +66,14 @@ export function MonthlyChargeCard(props: MonthlyChargeCardProps) {
               {props.status === "preview" ? "Prévia" : "Desatualizado"}
             </span>
           )}
+          {props.cycleOpen && (
+            <span className="charge-status charge-status--neutral">Ciclo em aberto</span>
+          )}
           {(refundStatus === "due" || refundStatus === "overpaid") && <RefundChip />}
           {settled && hasObligation && refundStatus === null && (
             <span className="charge-status charge-status--paid">
               <Check className="h-3.5 w-3.5" aria-hidden="true" />
-              Pago
+              {state.cycleOpen ? "Pago até agora" : "Pago"}
             </span>
           )}
           {refundStatus === "done" && (

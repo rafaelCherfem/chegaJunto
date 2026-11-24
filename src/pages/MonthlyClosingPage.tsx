@@ -1,6 +1,6 @@
 import { MonthHero } from "@/components/charges/MonthHero";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toCents } from "@/utils/money";
 import { ChargeSheet } from "@/components/charges/ChargeSheet";
 import { CloseCycleSheet } from "@/components/charges/CloseCycleSheet";
@@ -19,14 +19,13 @@ import { usePassengers } from "@/hooks/usePassengers";
 import { useReceivedRidesByPeriod } from "@/hooks/useReceivedRides";
 import { useGenerateReceipt } from "@/hooks/useReceipt";
 import { useRidesByPeriod } from "@/hooks/useRides";
-import { latestOpenPayment } from "@/utils/chargePayments";
+import { latestOpenPaymentEvent } from "@/utils/chargePayments";
 import { pendingCents } from "@/utils/chargeState";
 import {
   buildOpenCycle,
   closeCycleMinDate,
   groupChargesByPeriodEnd,
   hasNoOpenCycle,
-  hasWholeMonthLastCharge,
   latestClosedEnd,
   neverClosedPassengerIds,
   OPEN_CYCLE_KEY,
@@ -40,8 +39,13 @@ import {
   formatPeriodLabel,
   todayISODate,
 } from "@/utils/date";
+import { StaleObligationError } from "@/lib/cycleErrors";
 import { loadErrorKind, loadErrorMessages, reportLoadError } from "@/lib/loadErrors";
 import type { MonthlyCharge, Passenger } from "@/types/entities";
+
+// A confirmação da tela ficou velha: os dados foram recarregados e a operação não foi feita.
+const STALE_NOTICE =
+  "A cobrança mudou e a tela foi atualizada. Confira os valores e repita a operação.";
 
 function amountsMatch(a: number, b: number): boolean {
   return toCents(a) === toCents(b);
@@ -66,9 +70,18 @@ export function MonthlyClosingPage() {
     isLoading: loadingCharges,
     isError: chargesError,
     error: chargesFailure,
+    isFetching: fetchingCharges,
+    refetch: refetchCharges,
   } = useCycleCharges();
   const chargeIds = useMemo(() => (charges ?? []).map((charge) => charge.id), [charges]);
-  const { data: paymentEvents } = usePaymentEventsForCharges(chargeIds);
+  const {
+    data: paymentEvents,
+    isFetching: fetchingEvents,
+    refetch: refetchEvents,
+  } = usePaymentEventsForCharges(chargeIds);
+  // Enquanto os dados são recarregados, pagar e desfazer ficam desligados: uma ação sobre dados
+  // velhos seria recusada pelo banco com STALE_OBLIGATION.
+  const refreshing = fetchingCharges === true || fetchingEvents === true;
 
   const groups = useMemo(() => groupChargesByPeriodEnd(charges ?? []), [charges]);
   // Do mais recente ao mais antigo: o ciclo em aberto, depois os fechados.
@@ -96,9 +109,8 @@ export function MonthlyClosingPage() {
   const activeKey = keys[index]!;
   const selectedGroup = noOpenCycle ? (groups[index] ?? null) : index === 0 ? null : (groups[index - 1] ?? null);
   const lastClosing = charges ? latestClosedEnd(charges) : null;
-  // Proteção temporária: sem a lista de cobranças não dá para saber, então também bloqueia.
-  const wholeMonthLast = charges !== undefined && hasWholeMonthLastCharge(charges);
-  const closeBlocked = charges === undefined || wholeMonthLast;
+  // Sem a lista de cobranças ainda não dá para calcular o fechamento.
+  const closeBlocked = charges === undefined;
 
   // Uma faixa só de diárias e compensações. Ciclo fechado: do menor início ao fim. Ciclo em
   // aberto: do menor "fim do último ciclo + 1" até hoje, mais o histórico de quem nunca fechou.
@@ -142,6 +154,8 @@ export function MonthlyClosingPage() {
   const generateReceipt = useGenerateReceipt();
 
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  // Trava síncrona: um segundo clique no mesmo instante não dispara outra operação.
+  const actionRef = useRef(false);
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [selected, setSelected] = useState<{ id: string; key: string } | null>(null);
@@ -180,7 +194,7 @@ export function MonthlyClosingPage() {
     } else if (movementReady) {
       const open = buildOpenCycle(charges ?? [], rides ?? [], receivedRides ?? [], today);
       for (const row of open.rows) {
-        list.push({ passengerId: row.passengerId, charge: undefined, start: row.start, totals: row.totals });
+        list.push({ passengerId: row.passengerId, charge: row.charge, start: row.start, totals: row.totals });
       }
     }
     const nameOf = (id: string) => passengersById.get(id)?.name ?? "Passageiro";
@@ -206,8 +220,10 @@ export function MonthlyClosingPage() {
   // O que ainda falta receber nos ciclos que não são o mostrado.
   const otherOpenCents = useMemo(() => {
     let total = 0;
+    const shown = new Set((selectedGroup?.charges ?? []).map((charge) => charge.id));
     for (const charge of charges ?? []) {
-      if (selectedGroup && charge.periodEnd === selectedGroup.periodEnd) continue;
+      // O que já está na tela (o ciclo fechado mostrado ou o ciclo em aberto) não entra de novo.
+      if (shown.has(charge.id) || (!selectedGroup && charge.extensible)) continue;
       total += pendingCents({
         amount: charge.totalAmount,
         paidAmount: charge.paidAmount,
@@ -241,43 +257,43 @@ export function MonthlyClosingPage() {
     setCloseSheetOpen(true);
   }
 
-  // Se o bloqueio passar a valer com o sheet aberto, o sheet fecha antes de poder fechar o ciclo.
+  // Se os dados deixarem de estar disponíveis com o sheet aberto, ele fecha antes de poder encerrar.
   useEffect(() => {
     if (closeBlocked && !closedInSheet) setCloseSheetOpen(false);
   }, [closeBlocked, closedInSheet]);
 
-  async function handleMarkPaid(chargeId: string, revision: number) {
+  // Uma operação de pagamento por vez. Se o banco disser que a cobrança mudou (STALE_OBLIGATION),
+  // a tela recarrega os dados e avisa; nada foi gravado.
+  async function runPaymentAction(chargeId: string, action: () => Promise<unknown>) {
+    if (actionRef.current) return;
+    actionRef.current = true;
     setActionError(null);
     setTogglingId(chargeId);
 
     try {
-      await markPaid.mutateAsync({ id: chargeId, revision });
+      await action();
     } catch (error) {
-      setActionError(
-        error instanceof Error
-          ? error.message
-          : "Não foi possível atualizar o pagamento.",
-      );
+      if (error instanceof StaleObligationError) {
+        setActionError(STALE_NOTICE);
+        void refetchCharges?.();
+        void refetchEvents?.();
+      } else {
+        setActionError(
+          error instanceof Error ? error.message : "Não foi possível atualizar o pagamento.",
+        );
+      }
     } finally {
+      actionRef.current = false;
       setTogglingId(null);
     }
   }
 
-  async function handleUnmarkPaid(chargeId: string, paymentId: string) {
-    setActionError(null);
-    setTogglingId(chargeId);
+  function handleMarkPaid(chargeId: string, revision: number) {
+    return runPaymentAction(chargeId, () => markPaid.mutateAsync({ id: chargeId, revision }));
+  }
 
-    try {
-      await unmarkPaid.mutateAsync({ id: chargeId, paymentId });
-    } catch (error) {
-      setActionError(
-        error instanceof Error
-          ? error.message
-          : "Não foi possível atualizar o pagamento.",
-      );
-    } finally {
-      setTogglingId(null);
-    }
+  function handleUnmarkPaid(chargeId: string, paymentId: string) {
+    return runPaymentAction(chargeId, () => unmarkPaid.mutateAsync({ id: chargeId, paymentId }));
   }
 
   async function handleGenerateReceipt(passenger: Passenger, charge: MonthlyCharge) {
@@ -326,11 +342,8 @@ export function MonthlyClosingPage() {
     }
 
     const outdated = !amountsMatch(stored.totalAmount, computed);
-    const cancelablePaymentId = latestOpenPayment(
-      paymentEvents ?? [],
-      stored.id,
-      stored.paidAmount,
-    );
+    const undoEvent = latestOpenPaymentEvent(paymentEvents ?? [], stored.id, stored.paidAmount);
+    const cancelablePaymentId = undoEvent?.id ?? null;
 
     return {
       passengerName,
@@ -341,9 +354,11 @@ export function MonthlyClosingPage() {
       compensationAmount,
       paid: stored.paid,
       paidAmount: stored.paidAmount,
+      cycleOpen: stored.extensible,
       canUnmarkPaid: cancelablePaymentId !== null,
+      undoAmount: undoEvent?.signedAmount,
       sinceLabel,
-      toggling: togglingId === stored.id,
+      toggling: refreshing || togglingId === stored.id,
       generatingReceipt: generatingId === stored.id,
       onMarkPaid: () => handleMarkPaid(stored.id, stored.revision),
       onUnmarkPaid: () =>
@@ -354,7 +369,8 @@ export function MonthlyClosingPage() {
   }
 
   function sheetLabel(item: CycleItem): string {
-    return item.charge
+    // O ciclo em aberto ainda não tem fim: a cobrança guarda o último dia do mês, mas vale "a hoje".
+    return item.charge && !item.charge.extensible
       ? formatPeriodLabel(item.charge.periodStart, item.charge.periodEnd)
       : `${formatDateDisplay(item.start)} a hoje`;
   }
@@ -414,18 +430,11 @@ export function MonthlyClosingPage() {
       <Button onClick={openCloseSheet} disabled={noOpenCycle || closeBlocked}>
         Calcular fechamento
       </Button>
-      {wholeMonthLast ? (
+      {noOpenCycle && lastClosing && (
         <p className="text-sm text-muted-foreground">
-          O encerramento por data está sendo ajustado e volta em breve.
+          Todos os passageiros já estão fechados até {formatDateDisplay(lastClosing)}. Para fechar
+          de novo, é preciso haver movimento novo.
         </p>
-      ) : (
-        noOpenCycle &&
-        lastClosing && (
-          <p className="text-sm text-muted-foreground">
-            Todos os passageiros já estão fechados até {formatDateDisplay(lastClosing)}. Para
-            fechar de novo, é preciso haver movimento novo.
-          </p>
-        )
       )}
 
       {actionError && (
@@ -473,6 +482,7 @@ export function MonthlyClosingPage() {
               amount: stored?.totalAmount ?? computed,
               paidAmount: stored?.paidAmount ?? 0,
               paid: stored?.paid ?? false,
+              open: stored?.extensible === true,
               status: !stored
                 ? "preview"
                 : amountsMatch(stored.totalAmount, computed)

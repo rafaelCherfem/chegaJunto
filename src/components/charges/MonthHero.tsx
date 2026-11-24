@@ -10,6 +10,8 @@ type BillingRow = {
   paidAmount?: number;
   paid: boolean;
   status: "closed" | "preview" | "outdated";
+  /** Cobrança de ciclo em aberto: o total cresce até o encerramento. */
+  open?: boolean | undefined;
 };
 
 interface MonthHeroProps {
@@ -29,7 +31,7 @@ export function MonthHero({ rows, monthLabel, otherOpenCents = 0 }: MonthHeroPro
   let refundCents = 0;
   let unsettled = 0;
   for (const row of closed) {
-    const state = chargeState(row);
+    const state = chargeState({ ...row, cycleOpen: row.open });
     if (state.open) unsettled += 1;
     refundCents = addCents(refundCents, state.refundCents);
     if (state.isRefund) continue;
@@ -41,12 +43,16 @@ export function MonthHero({ rows, monthLabel, otherOpenCents = 0 }: MonthHeroPro
   }
 
   const totalCents = addCents(pendingCents, paidCents);
-  // Mês fechado e recebido: algo a receber existiu, nada ficou em aberto (nem
+  // Com algum ciclo em aberto o total ainda cresce: nunca é "Tudo recebido", só "Em dia até hoje".
+  const hasOpenCycle = rows.some((row) => row.open === true);
+  // Ciclo encerrado e recebido: algo a receber existiu, nada ficou em aberto (nem
   // devolução pendente) e não há prévia nem cobrança desatualizada esperando cálculo.
-  const allReceived =
+  const nothingMissing =
     totalCents > 0 &&
     unsettled === 0 &&
     rows.every((row) => row.status === "closed");
+  const allReceived = nothingMissing && !hasOpenCycle;
+  const upToDate = nothingMissing && hasOpenCycle;
   const paidShare = totalCents > 0 ? (paidCents / totalCents) * 100 : 0;
   const animated = useCountUp(pendingCents / 100);
 
@@ -66,6 +72,11 @@ export function MonthHero({ rows, monthLabel, otherOpenCents = 0 }: MonthHeroPro
           <CompleteMark>Tudo recebido</CompleteMark>
         </div>
       )}
+      {upToDate && (
+        <div className="mt-3">
+          <CompleteMark>Em dia até hoje</CompleteMark>
+        </div>
+      )}
 
       {totalCents > 0 && (
         <>
@@ -79,7 +90,7 @@ export function MonthHero({ rows, monthLabel, otherOpenCents = 0 }: MonthHeroPro
             <span>
               <span className="month-hero__dot month-hero__dot--paid" aria-hidden="true" />
               <strong className="tabular-nums">{formatCurrency(paidCents / 100)}</strong>{" "}
-              pago
+              {hasOpenCycle ? "pago até agora" : "pago"}
             </span>
             <span>
               <span

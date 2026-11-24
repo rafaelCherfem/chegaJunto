@@ -2,18 +2,18 @@ import { assertCalendarDate, assertReferenceMonth } from "@/utils/date";
 import { requestSignal, type SessionScope } from "@/lib/sessionScope";
 import { errorMessages } from "@/constants/errorMessages";
 import { loadErrorFrom } from "@/lib/loadErrors";
-import { mapCycleError, mapPaymentError } from "@/lib/cycleErrors";
+import { mapCycleError, mapPaymentError, StaleObligationError } from "@/lib/cycleErrors";
 import { toChargePaymentEvent, toCycleSummaryRow, toMonthlyCharge } from "@/lib/mappers";
 import { supabase } from "@/lib/supabase";
 import type { ChargePaymentEvent, CycleSummaryRow, MonthlyCharge } from "@/types/entities";
 function financialError(error: { code?: string; message?: string; hint?: string | null }): Error {
-  if (error.code === "40001") return new Error("A cobrança mudou. Atualize os dados e repita a operação.");
+  if (error.code === "40001") return new StaleObligationError();
   if (error.code === "23514" && error.message === "NO_OBLIGATION") return new Error("Nenhum valor pendente para registrar pagamento.");
   return mapCycleError(error) ?? mapPaymentError(error) ?? new Error(errorMessages.unexpected);
 }
 // register_payment: o HINT do banco (valor, teto) tem prioridade, inclusive no NO_OBLIGATION.
 function paymentFailure(error: { code?: string; message?: string; hint?: string | null }): Error {
-  if (error.code === "40001") return new Error("A cobrança mudou. Atualize os dados e repita a operação.");
+  if (error.code === "40001") return new StaleObligationError();
   return mapPaymentError(error) ?? mapCycleError(error) ?? new Error(errorMessages.unexpected);
 }
 // Quantos ids de cobrança vão em cada consulta de eventos (limite de tamanho da URL).

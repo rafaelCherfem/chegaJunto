@@ -53,6 +53,15 @@ export function mapCycleError(error: PostgrestLikeError): Error | null {
   return new Error(hint ? formatIsoDatesInText(hint) : ERRORS[token].fallback);
 }
 
+// A confirmação da tela ficou velha (o banco respondeu STALE_OBLIGATION, código 40001).
+// A tela reconhece este erro para recarregar os dados e avisar.
+export class StaleObligationError extends Error {
+  constructor() {
+    super("A cobrança mudou. Atualize os dados e repita a operação.");
+    this.name = "StaleObligationError";
+  }
+}
+
 // Erros do encerramento do ciclo em aberto e do pagamento de valor livre (migrações 0014 e 0015).
 // Ficam à parte de mapCycleError, que continua tratando só os cinco tokens do fechamento por ciclo.
 export type PaymentErrorToken =
