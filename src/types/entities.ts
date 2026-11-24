@@ -56,9 +56,11 @@ export interface MonthlyCharge {
   paidAmount: number;
   paidAt: string | null;
   createdAt: string;
+  /** Ciclo em aberto: o total gravado é "vivo" (soma tudo de periodStart em diante) até o encerramento. */
+  extensible: boolean;
 }
 
-export type CycleStatus = "CLOSED" | "SKIPPED" | "NO_MOVEMENT";
+export type CycleStatus = "CLOSED" | "SKIPPED" | "NO_MOVEMENT" | "EXTENDED";
 
 /** Uma linha do resumo de close_cycle e preview_cycle (um passageiro). */
 export interface CycleSummaryRow {
@@ -72,8 +74,14 @@ export interface CycleSummaryRow {
   periodStart: string | null;
   /** Em SKIPPED, o fim do último ciclo do passageiro; nos demais, a data escolhida. */
   periodEnd: string | null;
-  /** Só em CLOSED. */
+  /** Em CLOSED e EXTENDED. */
   totalAmount: number | null;
+  /** Já recebido do ciclo; nulo onde não há cobrança afetada (e num banco sem a migração 0014). */
+  paidAmount: number | null;
+  /** O que falta receber (0 se quitado). */
+  amountDue: number | null;
+  /** Saldo a devolver. */
+  refundDue: number | null;
 }
 
 export interface ChargePaymentEvent {

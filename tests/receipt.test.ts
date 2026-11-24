@@ -44,7 +44,7 @@ const charge = (overrides: Partial<MonthlyCharge>): MonthlyCharge => ({
   paid: false,
   paidAmount: 0,
   paidAt: null,
-  createdAt: "2026-10-20T12:00:00Z",
+  createdAt: "2026-10-20T12:00:00Z", extensible: false,
   ...overrides,
 });
 

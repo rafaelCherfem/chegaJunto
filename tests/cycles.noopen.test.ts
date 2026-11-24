@@ -15,7 +15,7 @@ const charge = (passengerId: string, periodEnd: string): MonthlyCharge => ({
   revision: 1,
   activePaymentId: null,
   paidAt: null,
-  createdAt: "2026-11-01T00:00:00Z",
+  createdAt: "2026-11-01T00:00:00Z", extensible: false,
 });
 
 describe("open cycle start", () => {

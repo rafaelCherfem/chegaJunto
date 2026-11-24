@@ -394,7 +394,7 @@ describe("session regression — actual Auth events and React Query", () => {
                 paid: true,
                 paidAmount: 10,
                 paidAt: "",
-                createdAt: "",
+                createdAt: "", extensible: false,
               },
             })
           }

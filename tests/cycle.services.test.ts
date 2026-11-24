@@ -39,9 +39,9 @@ const dbRows = [
   { passenger_id: "P3", status: "NO_MOVEMENT", reason: null, charge_id: null, period_start: "2026-12-01", period_end: "2026-12-06", total_amount: null },
 ];
 const entities = [
-  { passengerId: "P1", status: "CLOSED", reason: null, chargeId: "C1", periodStart: "2026-11-01", periodEnd: "2026-12-06", totalAmount: 126 },
-  { passengerId: "P2", status: "SKIPPED", reason: "ALREADY_CLOSED_UNTIL", chargeId: null, periodStart: null, periodEnd: "2026-12-31", totalAmount: null },
-  { passengerId: "P3", status: "NO_MOVEMENT", reason: null, chargeId: null, periodStart: "2026-12-01", periodEnd: "2026-12-06", totalAmount: null },
+  { passengerId: "P1", status: "CLOSED", reason: null, chargeId: "C1", periodStart: "2026-11-01", periodEnd: "2026-12-06", totalAmount: 126, paidAmount: null, amountDue: null, refundDue: null },
+  { passengerId: "P2", status: "SKIPPED", reason: "ALREADY_CLOSED_UNTIL", chargeId: null, periodStart: null, periodEnd: "2026-12-31", totalAmount: null, paidAmount: null, amountDue: null, refundDue: null },
+  { passengerId: "P3", status: "NO_MOVEMENT", reason: null, chargeId: null, periodStart: "2026-12-01", periodEnd: "2026-12-06", totalAmount: null, paidAmount: null, amountDue: null, refundDue: null },
 ];
 
 beforeEach(() => {

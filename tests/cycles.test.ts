@@ -24,7 +24,7 @@ const charge = (id: string, passengerId: string, periodStart: string, periodEnd:
   paid: false,
   paidAmount: 0,
   paidAt: null,
-  createdAt: "",
+  createdAt: "", extensible: false,
 });
 const ride = (id: string, passengerId: string, rideDate: string, rateCharged = 10): Ride => ({
   id,

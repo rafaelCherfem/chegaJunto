@@ -63,7 +63,7 @@ const row = (passengerId: string, status: CycleStatus, extra: Partial<CycleSumma
   chargeId: null,
   periodStart: status === "SKIPPED" ? null : "2026-12-07",
   periodEnd: status === "SKIPPED" ? "2026-12-06" : TODAY,
-  totalAmount: status === "CLOSED" ? 10 : null,
+  totalAmount: status === "CLOSED" ? 10 : null, paidAmount: null, amountDue: null, refundDue: null,
   ...extra,
 });
 

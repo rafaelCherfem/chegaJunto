@@ -46,7 +46,7 @@ const charge: MonthlyCharge = {
   paid: false,
   paidAmount: 90,
   paidAt: null,
-  createdAt: "",
+  createdAt: "", extensible: false,
 };
 
 let lease: ReturnType<typeof createSessionScope>;

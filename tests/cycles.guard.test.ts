@@ -15,6 +15,7 @@ const charge = (passengerId: string, periodStart: string, periodEnd: string): Mo
   activePaymentId: null,
   paidAt: null,
   createdAt: "2026-11-01T00:00:00Z",
+  extensible: false,
 });
 
 describe("whole-month period", () => {
