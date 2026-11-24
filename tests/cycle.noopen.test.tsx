@@ -89,7 +89,7 @@ describe("no open cycle: every closed passenger is closed through today or later
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.queryByText(/Ciclo em aberto/)).toBeNull();
     expect(screen.getByText("01/11/2026 a 30/11/2026")).toBeTruthy();
-    expect(screen.getByText("Sem ciclo em aberto: o último fechamento vai até 30/11/2026")).toBeTruthy();
+    expect(screen.getByText("Último período: até 30/11/2026. As novas diárias entram em um período novo.")).toBeTruthy();
     expect(screen.getByText("Ana")).toBeTruthy();
     expectNoInvertedRange();
     // Só o ciclo fechado que está na tela é consultado, nunca uma faixa do ciclo em aberto.
@@ -102,11 +102,9 @@ describe("no open cycle: every closed passenger is closed through today or later
     setData(seedCharges, seedPeople);
     render(<MonthlyClosingPage />);
     expect(calcButton().disabled).toBe(true);
-    expect(
-      screen.getByText(
-        "Todos os passageiros já estão fechados até 30/11/2026. Para fechar de novo, é preciso haver movimento novo.",
-      ),
-    ).toBeTruthy();
+    // Última cobrança de mês inteiro: vale a explicação da proteção, não a de "fechados até".
+    expect(screen.getByText("O encerramento por data está sendo ajustado e volta em breve.")).toBeTruthy();
+    expect(screen.queryByText(/Todos os passageiros já estão fechados/)).toBeNull();
     fireEvent.click(calcButton());
     expect(screen.queryByRole("dialog")).toBeNull();
   });
@@ -129,7 +127,7 @@ describe("no open cycle: every closed passenger is closed through today or later
     setData([charge("a", "A", "2026-11-01", "2026-11-30")], [{ id: "A", name: "Ana" }]);
     render(<MonthlyClosingPage />);
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.getByText("Sem ciclo em aberto: o último fechamento vai até 30/11/2026")).toBeTruthy();
+    expect(screen.getByText("Último período: até 30/11/2026. As novas diárias entram em um período novo.")).toBeTruthy();
     expectNoInvertedRange();
   });
 
@@ -137,7 +135,14 @@ describe("no open cycle: every closed passenger is closed through today or later
     setToday("2026-12-10");
     setData([charge("a", "A", "2026-12-01", "2026-12-10")], [{ id: "A", name: "Ana" }]);
     render(<MonthlyClosingPage />);
-    expect(screen.getByText("Sem ciclo em aberto: o último fechamento vai até 10/12/2026")).toBeTruthy();
+    expect(screen.getByText("Último período: até 10/12/2026. As novas diárias entram em um período novo.")).toBeTruthy();
+    // Fora do formato de mês inteiro: segue a explicação de sempre, sem a da proteção.
+    expect(
+      screen.getByText(
+        "Todos os passageiros já estão fechados até 10/12/2026. Para fechar de novo, é preciso haver movimento novo.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/está sendo ajustado/)).toBeNull();
     expect(calcButton().disabled).toBe(true);
   });
 });
@@ -155,7 +160,7 @@ describe("the open cycle exists", () => {
     );
     render(<MonthlyClosingPage />);
     expect(screen.getByText("Ciclo em aberto: 07/12/2026 a hoje")).toBeTruthy();
-    expect(screen.queryByText(/Sem ciclo em aberto/)).toBeNull();
+    expect(screen.queryByText(/Último período/)).toBeNull();
     expect(mocks.rides).toHaveBeenLastCalledWith("2026-12-07", "2026-12-10", [], true);
     expect(calcButton().disabled).toBe(false);
     expect(screen.queryByRole("alert")).toBeNull();
@@ -179,7 +184,7 @@ describe("the open cycle exists", () => {
     expect(screen.getByText("Ciclo em aberto: 05/12/2026 a hoje")).toBeTruthy();
     expect(screen.getByText("Caio")).toBeTruthy();
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.queryByText(/Sem ciclo em aberto/)).toBeNull();
+    expect(screen.queryByText(/Último período/)).toBeNull();
     expect(calcButton().disabled).toBe(false);
     expectNoInvertedRange();
   });
@@ -200,7 +205,7 @@ describe("the open cycle exists", () => {
     );
     rerender(<MonthlyClosingPage />);
     expect(screen.getByText("Ciclo em aberto: 09/12/2026 a hoje")).toBeTruthy();
-    expect(screen.queryByText(/Sem ciclo em aberto/)).toBeNull();
+    expect(screen.queryByText(/Último período/)).toBeNull();
     expect(calcButton().disabled).toBe(false);
   });
 

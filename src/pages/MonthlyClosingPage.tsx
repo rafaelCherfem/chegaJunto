@@ -26,6 +26,7 @@ import {
   closeCycleMinDate,
   groupChargesByPeriodEnd,
   hasNoOpenCycle,
+  hasWholeMonthLastCharge,
   latestClosedEnd,
   neverClosedPassengerIds,
   OPEN_CYCLE_KEY,
@@ -95,6 +96,9 @@ export function MonthlyClosingPage() {
   const activeKey = keys[index]!;
   const selectedGroup = noOpenCycle ? (groups[index] ?? null) : index === 0 ? null : (groups[index - 1] ?? null);
   const lastClosing = charges ? latestClosedEnd(charges) : null;
+  // Proteção temporária: sem a lista de cobranças não dá para saber, então também bloqueia.
+  const wholeMonthLast = charges !== undefined && hasWholeMonthLastCharge(charges);
+  const closeBlocked = charges === undefined || wholeMonthLast;
 
   // Uma faixa só de diárias e compensações. Ciclo fechado: do menor início ao fim. Ciclo em
   // aberto: do menor "fim do último ciclo + 1" até hoje, mais o histórico de quem nunca fechou.
@@ -142,6 +146,8 @@ export function MonthlyClosingPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [selected, setSelected] = useState<{ id: string; key: string } | null>(null);
   const [closeSheetOpen, setCloseSheetOpen] = useState(false);
+  // Depois de fechar, o sheet só mostra o resumo: não há mais como chamar o fechamento por ele.
+  const [closedInSheet, setClosedInSheet] = useState(false);
   // O sheet pertence ao ciclo em que foi aberto: trocar de ciclo o fecha.
   const selectedId = selected?.key === activeKey ? selected.id : null;
 
@@ -228,10 +234,17 @@ export function MonthlyClosingPage() {
   }, [charges, rides, receivedRides, selectedGroup, today]);
 
   function openCloseSheet() {
+    if (closeBlocked) return;
     // O seletor parte do ciclo em aberto, que é o que o movimento carregado descreve.
     setSelectedKey(OPEN_CYCLE_KEY);
+    setClosedInSheet(false);
     setCloseSheetOpen(true);
   }
+
+  // Se o bloqueio passar a valer com o sheet aberto, o sheet fecha antes de poder fechar o ciclo.
+  useEffect(() => {
+    if (closeBlocked && !closedInSheet) setCloseSheetOpen(false);
+  }, [closeBlocked, closedInSheet]);
 
   async function handleMarkPaid(chargeId: string, revision: number) {
     setActionError(null);
@@ -393,18 +406,26 @@ export function MonthlyClosingPage() {
 
       {noOpenCycle && lastClosing && (
         <p role="status" className="text-sm text-muted-foreground">
-          Sem ciclo em aberto: o último fechamento vai até {formatDateDisplay(lastClosing)}
+          Último período: até {formatDateDisplay(lastClosing)}. As novas diárias entram em um
+          período novo.
         </p>
       )}
 
-      <Button onClick={openCloseSheet} disabled={noOpenCycle}>
+      <Button onClick={openCloseSheet} disabled={noOpenCycle || closeBlocked}>
         Calcular fechamento
       </Button>
-      {noOpenCycle && lastClosing && (
+      {wholeMonthLast ? (
         <p className="text-sm text-muted-foreground">
-          Todos os passageiros já estão fechados até {formatDateDisplay(lastClosing)}. Para fechar
-          de novo, é preciso haver movimento novo.
+          O encerramento por data está sendo ajustado e volta em breve.
         </p>
+      ) : (
+        noOpenCycle &&
+        lastClosing && (
+          <p className="text-sm text-muted-foreground">
+            Todos os passageiros já estão fechados até {formatDateDisplay(lastClosing)}. Para
+            fechar de novo, é preciso haver movimento novo.
+          </p>
+        )
       )}
 
       {actionError && (
@@ -467,13 +488,14 @@ export function MonthlyClosingPage() {
         ))}
       </div>
 
-      {closeSheetOpen && (
+      {closeSheetOpen && (!closeBlocked || closedInSheet) && (
         <CloseCycleSheet
           today={today}
           minDate={closeMinDate}
           nameOf={(id) => passengersById.get(id)?.name ?? "Passageiro"}
           onClosed={(rows, endDate) => {
             // O ciclo criado termina na data escolhida; os dados novos chegam com a invalidação.
+            setClosedInSheet(true);
             setSelectedKey(rows.find((row) => row.status === "CLOSED")?.periodEnd ?? endDate);
           }}
           onDismiss={() => setCloseSheetOpen(false)}

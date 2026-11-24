@@ -1,4 +1,4 @@
-import { nextDay } from "@/utils/date";
+import { isCalendarDate, nextDay } from "@/utils/date";
 import { addCents, toCents } from "@/utils/money";
 import type { MonthlyCharge, ReceivedRide, Ride } from "@/types/entities";
 
@@ -51,6 +51,33 @@ export function openCycleLookback(charges: ReadonlyArray<MonthlyCharge>): string
     if (lookback === null || start < lookback) lookback = start;
   }
   return lookback;
+}
+
+/** Começa no dia 1 e termina no último dia do mesmo mês (o formato das cobranças vindas da conversão). */
+export function isWholeMonthPeriod(start: string, end: string): boolean {
+  if (!isCalendarDate(start) || !isCalendarDate(end)) return false;
+  return (
+    start.endsWith("-01") && start.slice(0, 7) === end.slice(0, 7) && nextDay(end).endsWith("-01")
+  );
+}
+
+/**
+ * Algum passageiro tem, como última cobrança (a de maior period_end), uma de mês inteiro.
+ * Só a última de cada passageiro conta. Sem cobranças, não é o caso.
+ * Proteção temporária: enquanto o encerramento por data não estende esse ciclo, fechar de novo
+ * criaria um período novo por cima dele.
+ */
+export function hasWholeMonthLastCharge(charges: ReadonlyArray<MonthlyCharge>): boolean {
+  const last = new Map<string, MonthlyCharge>();
+  for (const charge of charges) {
+    const current = last.get(charge.passengerId);
+    if (current === undefined || charge.periodEnd > current.periodEnd) {
+      last.set(charge.passengerId, charge);
+    }
+  }
+  return Array.from(last.values()).some((charge) =>
+    isWholeMonthPeriod(charge.periodStart, charge.periodEnd),
+  );
 }
 
 /** O maior fim de ciclo entre todos os passageiros, ou null se ninguém fechou. */
