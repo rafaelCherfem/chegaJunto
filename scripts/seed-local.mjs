@@ -26,8 +26,11 @@ const PASSENGERS = [
   { name: "João Pedro Alves", rate: 22 },
   // Quinto passageiro: um ciclo livre que cruza meses (ver seedCycle).
   { name: "Fernanda Rocha", rate: 28 },
+  // Sexto passageiro: o caso real do ciclo em aberto (ver seedOpenCycle).
+  { name: "Paulo Ribeiro", rate: 20 },
 ];
 const MONTHLY_PASSENGERS = 4; // os quatro primeiros seguem os MONTHS; o quinto usa close_cycle.
+const OPEN_CYCLE_PASSENGER = 5; // o sexto fica com o ciclo em aberto (extensível).
 
 // outcome: pending (sem pagamento), partial (paga e lança outra diária depois),
 // paid (paga por completo), refund (paga e apaga diárias depois: saldo a devolver).
@@ -43,6 +46,9 @@ const MONTHS = [
   },
   {
     offset: -1,
+    // Diárias do sexto passageiro neste mês: o close_month deste mês cria a cobrança de mês inteiro
+    // que depois fica em aberto (ver seedOpenCycle). Ele não tem diária em outro mês antes disso.
+    openCycleRides: 8,
     entries: [
       { rides: 11, outcome: "paid" },
       { rides: 13, outcome: "paid", received: 25 },
@@ -259,6 +265,17 @@ async function seedMonth(user, userId, passengers, today, plan) {
       rate_charged: passenger.rate + (i % 5 === 4 ? 6 : 0),
     })),
   );
+  if (plan.openCycleRides) {
+    const openPassenger = passengers[OPEN_CYCLE_PASSENGER];
+    for (const ride_date of spread(info.days, Math.min(plan.openCycleRides, info.days.length))) {
+      rides.push({
+        user_id: userId,
+        passenger_id: openPassenger.id,
+        ride_date,
+        rate_charged: openPassenger.rate,
+      });
+    }
+  }
   unwrap(await user.from("rides").insert(rides), "Inserir diárias");
 
   const received = picks
@@ -377,6 +394,66 @@ async function seedCycle(user, userId, passenger, today) {
   );
 }
 
+// Último dia do mês de uma faixa de monthInfo (o dia anterior ao primeiro do mês seguinte).
+function lastDayOf(info) {
+  const [y, m] = info.next.split("-").map(Number);
+  // info.next é o dia 1 do mês seguinte; o "dia 0" dele é o último dia do mês da faixa.
+  return new Date(Date.UTC(y, m - 1, 0)).toISOString().slice(0, 10);
+}
+
+// Caso real: o mês da conversão fica ABERTO e cresce. O sexto passageiro fecha o mês anterior
+// (close_month, igual aos outros), a cobrança dele é marcada como extensível e, depois, entram
+// diárias do mês atual e um pagamento parcial. Resultado: um ciclo "do dia 1 do mês anterior até
+// hoje" com total vivo, parte já paga e o resto a pagar.
+// A marcação é um UPDATE com a service key do Supabase LOCAL (a mesma trava do resto do seed);
+// em produção ela é feita à mão por scripts/marcar-extensivel-producao.sql.
+// Entra DEPOIS dos meses e do ciclo livre: com um ciclo extensível, close_month passa a recusar.
+async function seedOpenCycle(admin, user, userId, passenger, today) {
+  const previous = monthInfo(today, -1);
+  const current = monthInfo(today, 0);
+  const charge = await chargeOf(user, passenger.id, previous.first);
+  const marked = unwrap(
+    await admin
+      .from("monthly_charges")
+      .update({ extensible: true })
+      .eq("id", charge.id)
+      .eq("user_id", userId)
+      .eq("extensible", false)
+      .select("id"),
+    "Marcar o ciclo como em aberto",
+  );
+  if (marked.length !== 1) {
+    throw new Error(`Não foi possível marcar o ciclo de ${passenger.name} como em aberto. ${RESET_HINT}`);
+  }
+  const days = current.days.slice(0, Math.min(4, current.days.length));
+  if (days.length < 2) {
+    throw new Error(`Poucos dias úteis (${days.length}) no mês atual para o ciclo em aberto. Rode a partir do dia 3.`);
+  }
+  unwrap(
+    await user.from("rides").insert(
+      days.map((ride_date) => ({
+        user_id: userId,
+        passenger_id: passenger.id,
+        ride_date,
+        rate_charged: passenger.rate,
+      })),
+    ),
+    "Inserir diárias do ciclo em aberto",
+  );
+  const live = await chargeOf(user, passenger.id, previous.first);
+  const amount = Math.floor(Number(live.total_amount) / 2);
+  unwrap(
+    await user
+      .rpc("register_payment", {
+        target_charge: live.id,
+        payment_amount: amount,
+        expected_revision: live.revision,
+      })
+      .single(),
+    "Registrar pagamento parcial do ciclo em aberto",
+  );
+}
+
 function stateOf(charge) {
   const total = cents(charge.total_amount);
   const paid = cents(charge.paid_amount);
@@ -452,6 +529,45 @@ async function summarize(user, passengers, today) {
     "Saldo a devolver": money(Math.max(paid - total, 0)),
     Estado: found,
   });
+  // Ciclo em aberto do sexto passageiro: extensível, com o total vivo e pagamento parcial.
+  const openPassenger = passengers[OPEN_CYCLE_PASSENGER];
+  const previous = monthInfo(today, -1);
+  const open = unwrap(
+    await user
+      .from("monthly_charges")
+      .select("total_amount,paid_amount,paid,period_start,period_end,extensible")
+      .eq("passenger_id", openPassenger.id),
+    "Ler o ciclo em aberto para o resumo",
+  );
+  const openRides = unwrap(
+    await user.from("rides").select("rate_charged").eq("passenger_id", openPassenger.id),
+    "Ler as diárias do ciclo em aberto",
+  );
+  const liveTotal = openRides.reduce((sum, ride) => sum + cents(ride.rate_charged), 0);
+  const openState = open.length === 1 ? stateOf(open[0]) : `${open.length} cobranças`;
+  if (
+    open.length !== 1 ||
+    open[0].extensible !== true ||
+    open[0].period_start !== previous.first ||
+    open[0].period_end !== lastDayOf(previous) ||
+    cents(open[0].total_amount) !== liveTotal ||
+    openState !== "Parcial"
+  ) {
+    throw new Error(
+      `Ciclo em aberto de ${openPassenger.name} fora do esperado (extensível desde ${previous.first}, total vivo ${money(liveTotal / 100)}, "Parcial"); encontrado: ${openState}. ${RESET_HINT}`,
+    );
+  }
+  const openTotal = Number(open[0].total_amount);
+  const openPaid = Number(open[0].paid_amount);
+  rows.push({
+    Mês: `${previous.first} a hoje (em aberto)`,
+    Passageiro: openPassenger.name,
+    Total: money(openTotal),
+    Pago: money(openPaid),
+    "A pagar": money(Math.max(openTotal - openPaid, 0)),
+    "Saldo a devolver": money(Math.max(openPaid - openTotal, 0)),
+    Estado: openState,
+  });
   console.table(rows);
 }
 
@@ -490,6 +606,7 @@ async function main() {
       await seedMonth(user, userId, passengers, today, plan);
     }
     await seedCycle(user, userId, passengers[MONTHLY_PASSENGERS], today);
+    await seedOpenCycle(admin, user, userId, passengers[OPEN_CYCLE_PASSENGER], today);
     console.log("Dados de teste criados.");
   } else {
     passengers = PASSENGERS.map((p) => ({
