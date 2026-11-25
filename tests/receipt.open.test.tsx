@@ -10,12 +10,14 @@ const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
   rides: vi.fn(),
   received: vi.fn(),
+  events: vi.fn(),
   pdf: vi.fn(),
   download: vi.fn(),
 }));
 vi.mock("@/hooks/useAuth", () => ({ useAuth: mocks.auth }));
 vi.mock("@/services/rides.service", () => ({ listRidesByPeriod: mocks.rides }));
 vi.mock("@/services/receivedRides.service", () => ({ listReceivedRidesByPeriod: mocks.received }));
+vi.mock("@/services/monthlyCharges.service", () => ({ listPaymentEventsForCharges: mocks.events }));
 vi.mock("@/services/pdf.service", () => ({ generateMonthlyReceipt: mocks.pdf }));
 vi.mock("@/utils/downloadFile", () => ({ downloadFile: mocks.download }));
 
@@ -46,6 +48,7 @@ beforeEach(() => {
   mocks.auth.mockImplementation(() => ({ scope: lease.scope, user: { id: "A" }, loading: false }));
   mocks.rides.mockResolvedValue([]);
   mocks.received.mockResolvedValue([]);
+  mocks.events.mockResolvedValue([]);
   mocks.pdf.mockResolvedValue(new Uint8Array([1]));
 });
 
@@ -61,6 +64,14 @@ describe("useGenerateReceipt with an open cycle", () => {
     expect(mocks.received).not.toHaveBeenCalled();
     expect(mocks.pdf).not.toHaveBeenCalled();
     expect(mocks.download).not.toHaveBeenCalled();
+  });
+
+  it("does not load the payments of an open cycle either", async () => {
+    const { result } = renderHook(useGenerateReceipt, { wrapper });
+    await act(async () => {
+      await expect(result.current.mutateAsync({ passenger, charge })).rejects.toThrow();
+    });
+    expect(mocks.events).not.toHaveBeenCalled();
   });
 
   it("a closed charge is generated as before", async () => {

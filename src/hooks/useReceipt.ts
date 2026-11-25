@@ -1,4 +1,5 @@
 import { usePrivateMutation } from "@/hooks/usePrivateQuery";
+import { listPaymentEventsForCharges } from "@/services/monthlyCharges.service";
 import { generateMonthlyReceipt } from "@/services/pdf.service";
 import { listReceivedRidesByPeriod } from "@/services/receivedRides.service";
 import { listRidesByPeriod } from "@/services/rides.service";
@@ -17,9 +18,11 @@ export function useGenerateReceipt() {
       if (charge.extensible) throw new Error("Encerre o ciclo para gerar o comprovante.");
       // O comprovante cobre o período da própria cobrança, não o mês de calendário.
       const { periodStart, periodEnd } = charge;
-      const [rides, receivedRides] = await Promise.all([
+      // Os pagamentos vêm do banco na hora de gerar, não do cache da tela.
+      const [rides, receivedRides, paymentEvents] = await Promise.all([
         listRidesByPeriod(periodStart, periodEnd, passenger.id, scope),
         listReceivedRidesByPeriod(periodStart, periodEnd, passenger.id, scope),
+        listPaymentEventsForCharges([charge.id], scope),
       ]);
       scope.assertCurrent();
       const bytes = await generateMonthlyReceipt({
@@ -27,6 +30,7 @@ export function useGenerateReceipt() {
         charge,
         rides,
         receivedRides,
+        paymentEvents,
         periodStart,
         periodEnd,
       });

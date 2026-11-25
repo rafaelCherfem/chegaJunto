@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   rides: vi.fn(),
   received: vi.fn(),
   byMonth: vi.fn(),
+  events: vi.fn(),
   pdf: vi.fn(),
   download: vi.fn(),
 }));
@@ -23,6 +24,7 @@ vi.mock("@/services/receivedRides.service", () => ({
   listReceivedRidesByPeriod: mocks.received,
   listReceivedRidesByMonth: mocks.byMonth,
 }));
+vi.mock("@/services/monthlyCharges.service", () => ({ listPaymentEventsForCharges: mocks.events }));
 vi.mock("@/services/pdf.service", () => ({ generateMonthlyReceipt: mocks.pdf }));
 vi.mock("@/utils/downloadFile", () => ({ downloadFile: mocks.download }));
 
@@ -61,6 +63,7 @@ beforeEach(() => {
   mocks.auth.mockImplementation(() => ({ scope: lease.scope, user: { id: "A" }, loading: false }));
   mocks.rides.mockResolvedValue([{ id: "r1" }]);
   mocks.received.mockResolvedValue([{ id: "x1" }]);
+  mocks.events.mockResolvedValue([]);
   mocks.pdf.mockResolvedValue(new Uint8Array([1, 2, 3]));
 });
 
@@ -89,6 +92,28 @@ describe("useGenerateReceipt", () => {
         periodEnd: "2026-12-06",
       }),
     );
+  });
+
+  it("fetches the payment events of the charge itself and hands them to the PDF", async () => {
+    const events = [{ id: "e1", monthlyChargeId: "C1", kind: "PAYMENT", revision: 1, signedAmount: 90, relatedPaymentId: null, occurredAt: "2026-11-20T15:00:00Z" }];
+    mocks.events.mockResolvedValue(events);
+    const { result } = renderHook(useGenerateReceipt, { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync({ passenger, charge });
+    });
+    expect(mocks.events).toHaveBeenCalledTimes(1);
+    expect(mocks.events).toHaveBeenCalledWith(["C1"], expect.anything());
+    expect(mocks.pdf).toHaveBeenCalledWith(expect.objectContaining({ paymentEvents: events }));
+  });
+
+  it("does not generate a file when the payments cannot be loaded", async () => {
+    mocks.events.mockRejectedValue(new Error("Não foi possível concluir a operação"));
+    const { result } = renderHook(useGenerateReceipt, { wrapper });
+    await act(async () => {
+      await expect(result.current.mutateAsync({ passenger, charge })).rejects.toThrow("Não foi possível concluir a operação");
+    });
+    expect(mocks.pdf).not.toHaveBeenCalled();
+    expect(mocks.download).not.toHaveBeenCalled();
   });
 
   it("names the file with the passenger and both dates", async () => {
