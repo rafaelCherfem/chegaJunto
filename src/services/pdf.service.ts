@@ -29,11 +29,19 @@ export interface ReceiptLine {
   bold?: boolean;
   gray?: boolean;
   spaceBefore?: number;
+  /** Cabeçalho: repetido no alto de cada página. */
+  repeat?: boolean;
+  /** Esta linha fica na mesma página que a próxima (título com o que ele introduz). */
+  keepWithNext?: boolean;
 }
 
 const PAGE_WIDTH = 595.28;
 const PAGE_HEIGHT = 841.89;
 const MARGIN = 48;
+// Linhas por página: o que cabe entre as duas margens.
+const PAGE_CAPACITY = PAGE_HEIGHT - 2 * MARGIN;
+// Até este número de pagamentos o bloco do total fica inteiro na mesma página.
+const MAX_PAYMENTS_KEPT_TOGETHER = 6;
 
 const byDate = <T>(key: (item: T) => string) => (a: T, b: T) =>
   key(a) < key(b) ? -1 : 1;
@@ -124,14 +132,15 @@ export function buildReceiptLines(
   generatedOn = todayISODate(),
 ): ReceiptLine[] {
   const lines: ReceiptLine[] = [
-    { text: "chegaJunto", size: 20, bold: true },
+    { text: "chegaJunto", size: 20, bold: true, repeat: true },
     {
       text: `Comprovante de diárias — ${formatDateDisplay(periodStart)} a ${formatDateDisplay(periodEnd)}`,
       size: 12,
       gray: true,
+      repeat: true,
     },
-    { text: `Passageiro: ${passenger.name}`, bold: true, size: 13, spaceBefore: 8 },
-    { text: "Diárias registradas", bold: true, spaceBefore: 8 },
+    { text: `Passageiro: ${passenger.name}`, bold: true, size: 13, spaceBefore: 8, repeat: true },
+    { text: "Diárias registradas", bold: true, spaceBefore: 8, keepWithNext: true },
   ];
 
   const sortedRides = [...rides].sort(byDate((ride) => ride.rideDate));
@@ -147,7 +156,7 @@ export function buildReceiptLines(
 
   const sortedReceived = [...receivedRides].sort(byDate((item) => item.receivedDate));
   if (sortedReceived.length > 0) {
-    lines.push({ text: "Compensações", bold: true, spaceBefore: 8 });
+    lines.push({ text: "Compensações", bold: true, spaceBefore: 8, keepWithNext: true });
     for (const received of sortedReceived) {
       lines.push({
         text: `${formatDateDisplay(received.receivedDate)}  —  ${formatCurrency(received.amount)}`,
@@ -165,8 +174,9 @@ export function buildReceiptLines(
     lines.push({
       text: `Diárias: ${formatCurrency(rideCents / 100)}`,
       spaceBefore: 8,
+      keepWithNext: true,
     });
-    lines.push({ text: `Compensação: -${formatCurrency(compensationCents / 100)}` });
+    lines.push({ text: `Compensação: -${formatCurrency(compensationCents / 100)}`, keepWithNext: true });
   }
 
   // Bloco final: total, pagamentos recebidos, já pago, falta pagar e situação.
@@ -182,6 +192,17 @@ export function buildReceiptLines(
     ...paymentSection(payments),
     ...receiptSituation(charge, lastPayment?.occurredAt),
   ];
+  // O bloco não se separa do seu título. Com muitos pagamentos a lista pode atravessar a página,
+  // mas o título fica com o primeiro pagamento e o último fica com o resumo.
+  const lastPaymentIndex = payments.length > 0 ? payments.length + 1 : -1;
+  tail.forEach((line, index) => {
+    if (index === tail.length - 1) return;
+    const together =
+      payments.length <= MAX_PAYMENTS_KEPT_TOGETHER ||
+      index <= 2 ||
+      index >= lastPaymentIndex;
+    if (together) line.keepWithNext = true;
+  });
   lines.push(...tail);
 
   lines.push({
@@ -192,6 +213,62 @@ export function buildReceiptLines(
   });
 
   return lines;
+}
+
+const lineHeight = (line: ReceiptLine) => (line.spaceBefore ?? 0) + (line.size ?? 11) + 8;
+
+/**
+ * Reparte as linhas em páginas. Cada página começa com o cabeçalho (título do ciclo e nome do
+ * passageiro); uma linha nunca é cortada, e as que têm `keepWithNext` vão juntas com a seguinte.
+ */
+export function paginateReceipt(lines: ReceiptLine[]): ReceiptLine[][] {
+  const header = lines.filter((line) => line.repeat);
+  const body = lines.filter((line) => !line.repeat);
+  const headerHeight = header.reduce((sum, line) => sum + lineHeight(line), 0);
+
+  const pages: ReceiptLine[][] = [[...header]];
+  let used = headerHeight;
+  let bodyOnPage = 0;
+
+  const newPage = () => {
+    pages.push([...header]);
+    used = headerHeight;
+    bodyOnPage = 0;
+  };
+  const place = (line: ReceiptLine) => {
+    // No alto de uma página não sobra espaço antes da linha.
+    const placed = bodyOnPage === 0 && line.spaceBefore ? { ...line, spaceBefore: 0 } : line;
+    pages[pages.length - 1]!.push(placed);
+    used += lineHeight(placed);
+    bodyOnPage += 1;
+  };
+
+  // Unidades: uma linha, ou a sequência de linhas ligadas por keepWithNext.
+  const units: ReceiptLine[][] = [];
+  let current: ReceiptLine[] = [];
+  for (const line of body) {
+    current.push(line);
+    if (!line.keepWithNext) {
+      units.push(current);
+      current = [];
+    }
+  }
+  if (current.length > 0) units.push(current);
+
+  for (const unit of units) {
+    const need = unit.reduce((sum, line) => sum + lineHeight(line), 0);
+    if (used + need > PAGE_CAPACITY && bodyOnPage > 0) newPage();
+    if (used + need <= PAGE_CAPACITY) {
+      unit.forEach(place);
+      continue;
+    }
+    // Mais alta que uma página inteira: segue linha a linha.
+    for (const line of unit) {
+      if (used + lineHeight(line) > PAGE_CAPACITY && bodyOnPage > 0) newPage();
+      place(line);
+    }
+  }
+  return pages;
 }
 
 export function stripUnsupported(text: string, supported: Set<number>): string {
@@ -215,19 +292,21 @@ export async function generateMonthlyReceipt(data: ReceiptData): Promise<Uint8Ar
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const supported = new Set(font.getCharacterSet());
 
-  const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-  let cursorY = PAGE_HEIGHT - MARGIN;
-  for (const line of buildReceiptLines(data)) {
-    const size = line.size ?? 11;
-    cursorY -= line.spaceBefore ?? 0;
-    page.drawText(stripUnsupported(line.text, supported), {
-      x: MARGIN,
-      y: cursorY,
-      size,
-      font: line.bold ? boldFont : font,
-      color: line.gray ? rgb(0.45, 0.45, 0.45) : rgb(0, 0, 0),
-    });
-    cursorY -= size + 8;
+  for (const pageLines of paginateReceipt(buildReceiptLines(data))) {
+    const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+    let cursorY = PAGE_HEIGHT - MARGIN;
+    for (const line of pageLines) {
+      const size = line.size ?? 11;
+      cursorY -= line.spaceBefore ?? 0;
+      page.drawText(stripUnsupported(line.text, supported), {
+        x: MARGIN,
+        y: cursorY,
+        size,
+        font: line.bold ? boldFont : font,
+        color: line.gray ? rgb(0.45, 0.45, 0.45) : rgb(0, 0, 0),
+      });
+      cursorY -= size + 8;
+    }
   }
 
   return pdfDoc.save();

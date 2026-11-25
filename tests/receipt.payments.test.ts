@@ -1,5 +1,6 @@
+import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
-import { buildReceiptLines } from "@/services/pdf.service";
+import { buildReceiptLines, generateMonthlyReceipt, paginateReceipt } from "@/services/pdf.service";
 import type { ChargePaymentEvent, MonthlyCharge, Passenger, ReceivedRide, Ride } from "@/types/entities";
 
 const passenger: Passenger = {
@@ -149,5 +150,120 @@ describe("received payments in the receipt", () => {
   it("omits the section when nothing was paid", () => {
     expect(tail(receiptText({}, []))).toBe("Total do período: R$ 30,00\nPassageiro deve R$ 30,00\nSituação: pendente");
     expect(tail(receiptText({}))).toBe("Total do período: R$ 30,00\nPassageiro deve R$ 30,00\nSituação: pendente");
+  });
+});
+
+// Ciclo longo: n diárias em dias seguidos, a partir de 01/09/2026.
+function manyRides(count: number): Ride[] {
+  return Array.from({ length: count }, (_, i) => ride(new Date(Date.UTC(2026, 8, 1 + i)).toISOString().slice(0, 10)));
+}
+function longReceipt(rideCount: number, payments: ChargePaymentEvent[]) {
+  const rides = manyRides(rideCount);
+  const paid = payments.reduce((sum, p) => sum + p.signedAmount, 0);
+  const data = {
+    passenger,
+    charge: charge({ totalAmount: rideCount * 15, paidAmount: paid, periodStart: "2026-09-01", periodEnd: "2026-12-31" }),
+    rides,
+    receivedRides: [],
+    periodStart: "2026-09-01",
+    periodEnd: "2026-12-31",
+    paymentEvents: payments,
+  };
+  return { data, lines: buildReceiptLines(data, "2026-12-31") };
+}
+const heightOf = (line: { spaceBefore?: number; size?: number }) => (line.spaceBefore ?? 0) + (line.size ?? 11) + 8;
+const CAPACITY = 841.89 - 2 * 48;
+const threePayments = [
+  payment("a", 1, 10, "2026-10-10T15:00:00Z"),
+  payment("b", 2, 20, "2026-10-20T15:00:00Z"),
+  payment("c", 3, 8.5, "2026-11-05T15:00:00Z"),
+];
+
+describe("receipt pagination", () => {
+  it("a short receipt stays on one page", () => {
+    const { lines } = longReceipt(2, [first]);
+    expect(paginateReceipt(lines)).toHaveLength(1);
+  });
+
+  it("38 rides (the seed's Fernanda cycle) and 45 rides with payments take two pages", () => {
+    expect(paginateReceipt(longReceipt(38, threePayments).lines)).toHaveLength(2);
+    expect(paginateReceipt(longReceipt(45, threePayments).lines)).toHaveLength(2);
+  });
+
+  it("repeats the title of the cycle and the passenger name at the top of every page", () => {
+    const pages = paginateReceipt(longReceipt(150, threePayments).lines);
+    expect(pages.length).toBeGreaterThanOrEqual(4);
+    for (const page of pages) {
+      expect(page[0]!.text).toBe("chegaJunto");
+      expect(page[1]!.text).toBe("Comprovante de diárias — 01/09/2026 a 31/12/2026");
+      expect(page[2]!.text).toBe("Passageiro: Ana");
+    }
+  });
+
+  it("never lets the lines of a page go past the bottom margin", () => {
+    for (const count of [30, 38, 45, 60, 150]) {
+      for (const page of paginateReceipt(longReceipt(count, threePayments).lines)) {
+        expect(page.reduce((sum, line) => sum + heightOf(line), 0)).toBeLessThanOrEqual(CAPACITY);
+      }
+    }
+  });
+
+  it("keeps every line, once and in order, only adding the repeated header", () => {
+    const { lines } = longReceipt(45, threePayments);
+    const body = lines.filter((line) => !line.repeat).map((line) => line.text);
+    const paged = paginateReceipt(lines).flatMap((page) => page.filter((line) => !line.repeat).map((line) => line.text));
+    expect(paged).toEqual(body);
+  });
+
+  it("never starts a page with blank space before the first line", () => {
+    const pages = paginateReceipt(longReceipt(45, threePayments).lines);
+    expect(pages[1]![3]!.spaceBefore ?? 0).toBe(0);
+  });
+
+  it("keeps the total block together with its title, whatever the number of rides", () => {
+    for (let count = 1; count <= 90; count++) {
+      const pages = paginateReceipt(longReceipt(count, threePayments).lines);
+      const texts = pages.map((page) => page.map((line) => line.text));
+      const where = (prefix: string) => texts.findIndex((page) => page.some((text) => text.startsWith(prefix)));
+      // Total, título dos pagamentos, o primeiro e o último pagamento e a situação, na mesma página.
+      expect(where("Situação:"), `${count} diárias`).toBe(where("Total do período"));
+      expect(where("Pagamentos recebidos"), `${count} diárias`).toBe(where("Total do período"));
+      expect(where("Já pago"), `${count} diárias`).toBe(where("Total do período"));
+      // O título das diárias nunca fica sozinho no fim da página.
+      const heading = texts[where("Diárias registradas")]!;
+      expect(heading.indexOf("Diárias registradas")).toBeLessThan(heading.length - 1);
+    }
+  });
+
+  it("with many payments the list may cross pages, but the title keeps the first one and the summary keeps the last", () => {
+    const many = Array.from({ length: 40 }, (_, i) =>
+      payment(`p${i}`, i + 1, 1, `2026-10-${String((i % 28) + 1).padStart(2, "0")}T15:00:00Z`),
+    );
+    const { lines } = longReceipt(30, many);
+    const pages = paginateReceipt(lines).map((page) => page.map((line) => line.text));
+    const pageOf = (predicate: (text: string) => boolean) => pages.findIndex((page) => page.some(predicate));
+    expect(pages.length).toBeGreaterThan(1);
+    expect(pageOf((text) => text.startsWith("Total do período"))).toBe(pageOf((text) => text === "Pagamentos recebidos"));
+    const heading = pages[pageOf((text) => text === "Pagamentos recebidos")]!;
+    expect(heading.indexOf("Pagamentos recebidos")).toBeLessThan(heading.length - 1);
+    expect(pageOf((text) => text.startsWith("Já pago"))).toBe(pageOf((text) => text.startsWith("Situação:")));
+    const summary = pages[pageOf((text) => text.startsWith("Já pago"))]!;
+    // A linha logo acima do "Já pago" é o último pagamento.
+    expect(summary[summary.findIndex((text) => text.startsWith("Já pago")) - 1]).toMatch(/^\d{2}\/\d{2}\/2026/);
+  });
+});
+
+describe("receipt PDF with pagination", () => {
+  it("opens as a real PDF with the number of pages the layout planned", async () => {
+    for (const count of [2, 38, 45, 150]) {
+      const { data, lines } = longReceipt(count, threePayments);
+      const bytes = await generateMonthlyReceipt(data);
+      const loaded = await PDFDocument.load(bytes);
+      expect(loaded.getPageCount(), `${count} diárias`).toBe(paginateReceipt(lines).length);
+    }
+    const short = await PDFDocument.load(await generateMonthlyReceipt(longReceipt(2, [first]).data));
+    expect(short.getPageCount()).toBe(1);
+    const long = await PDFDocument.load(await generateMonthlyReceipt(longReceipt(45, threePayments).data));
+    expect(long.getPageCount()).toBe(2);
   });
 });
