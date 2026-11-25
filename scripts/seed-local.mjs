@@ -239,6 +239,30 @@ async function payOutstanding(user, passengerId, first) {
   );
 }
 
+// Adiantamento de valor livre (register_payment), sempre como o usuário de teste: a revisão
+// é lida de novo a cada pagamento, porque cada um sobe a revisão da cobrança.
+async function registerFreePayment(user, chargeId, amount, context) {
+  const { data: current } = await user
+    .from("monthly_charges")
+    .select("revision")
+    .eq("id", chargeId)
+    .single();
+  unwrap(
+    await user
+      .rpc("register_payment", {
+        target_charge: chargeId,
+        payment_amount: amount,
+        expected_revision: current.revision,
+      })
+      .single(),
+    context,
+  );
+}
+
+// Dois adiantamentos do ciclo livre (Fernanda) e o segundo do ciclo em aberto (Paulo).
+const CYCLE_ADVANCES = [10, 8.5];
+const OPEN_CYCLE_SECOND_ADVANCE = 10.5;
+
 async function seedMonth(user, userId, passengers, today, plan) {
   const info = monthInfo(today, plan.offset);
   if (info.days.length < 4) {
@@ -392,6 +416,10 @@ async function seedCycle(user, userId, passenger, today) {
     }),
     "Inserir diária dentro do ciclo fechado",
   );
+  // Depois da diária que faltava, dois adiantamentos de valor livre sobre o que ficou em aberto.
+  for (const amount of CYCLE_ADVANCES) {
+    await registerFreePayment(user, mine.charge_id, amount, "Registrar adiantamento do ciclo livre");
+  }
 }
 
 // Último dia do mês de uma faixa de monthInfo (o dia anterior ao primeiro do mês seguinte).
@@ -452,6 +480,22 @@ async function seedOpenCycle(admin, user, userId, passenger, today) {
       .single(),
     "Registrar pagamento parcial do ciclo em aberto",
   );
+  await registerFreePayment(user, live.id, OPEN_CYCLE_SECOND_ADVANCE, "Registrar o segundo adiantamento do ciclo em aberto");
+}
+
+// Pagamentos em vigor (PAYMENT sem CANCEL) de uma cobrança, direto dos eventos.
+async function paymentsOf(user, chargeId) {
+  const events = unwrap(
+    await user
+      .from("monthly_charge_events")
+      .select("id,kind,signed_amount,related_payment_id")
+      .eq("monthly_charge_id", chargeId)
+      .in("kind", ["PAYMENT", "CANCEL"]),
+    "Ler os pagamentos da cobrança",
+  );
+  const cancelled = new Set(events.filter((e) => e.kind === "CANCEL").map((e) => e.related_payment_id));
+  const live = events.filter((e) => e.kind === "PAYMENT" && !cancelled.has(e.id));
+  return { count: live.length, cents: live.reduce((sum, e) => sum + cents(e.signed_amount), 0) };
 }
 
 function stateOf(charge) {
@@ -503,7 +547,7 @@ async function summarize(user, passengers, today) {
   const cycle = unwrap(
     await user
       .from("monthly_charges")
-      .select("total_amount,paid_amount,paid,period_start,period_end")
+      .select("id,total_amount,paid_amount,paid,period_start,period_end")
       .eq("passenger_id", cyclePassenger.id),
     "Ler o ciclo livre para o resumo",
   );
@@ -516,6 +560,18 @@ async function summarize(user, passengers, today) {
   ) {
     throw new Error(
       `Ciclo livre de ${cyclePassenger.name} fora do esperado (${window.start} a ${window.end}, "Parcial"); encontrado: ${found}. ${RESET_HINT}`,
+    );
+  }
+  // Pagamento integral + dois adiantamentos; o que falta é a diária de depois menos os adiantamentos.
+  const cyclePayments = await paymentsOf(user, cycle[0].id);
+  const advances = CYCLE_ADVANCES.reduce((sum, amount) => sum + cents(amount), 0);
+  if (
+    cyclePayments.count !== 1 + CYCLE_ADVANCES.length ||
+    cyclePayments.cents !== cents(cycle[0].paid_amount) ||
+    cents(cycle[0].total_amount) - cents(cycle[0].paid_amount) !== cents(cyclePassenger.rate) - advances
+  ) {
+    throw new Error(
+      `Adiantamentos de ${cyclePassenger.name} fora do esperado (${1 + CYCLE_ADVANCES.length} pagamentos somando o pago, faltando ${money(cyclePassenger.rate - advances / 100)}). ${RESET_HINT}`,
     );
   }
   const total = Number(cycle[0].total_amount);
@@ -535,7 +591,7 @@ async function summarize(user, passengers, today) {
   const open = unwrap(
     await user
       .from("monthly_charges")
-      .select("total_amount,paid_amount,paid,period_start,period_end,extensible")
+      .select("id,total_amount,paid_amount,paid,period_start,period_end,extensible")
       .eq("passenger_id", openPassenger.id),
     "Ler o ciclo em aberto para o resumo",
   );
@@ -555,6 +611,17 @@ async function summarize(user, passengers, today) {
   ) {
     throw new Error(
       `Ciclo em aberto de ${openPassenger.name} fora do esperado (extensível desde ${previous.first}, total vivo ${money(liveTotal / 100)}, "Parcial"); encontrado: ${openState}. ${RESET_HINT}`,
+    );
+  }
+  // Primeiro pagamento = metade do total (arredondada para baixo) e o segundo adiantamento fixo.
+  const openPayments = await paymentsOf(user, open[0].id);
+  if (
+    openPayments.count !== 2 ||
+    openPayments.cents !== cents(open[0].paid_amount) ||
+    cents(open[0].paid_amount) !== Math.floor(Number(open[0].total_amount) / 2) * 100 + cents(OPEN_CYCLE_SECOND_ADVANCE)
+  ) {
+    throw new Error(
+      `Adiantamentos de ${openPassenger.name} fora do esperado (2 pagamentos, o segundo de ${money(OPEN_CYCLE_SECOND_ADVANCE)}). ${RESET_HINT}`,
     );
   }
   const openTotal = Number(open[0].total_amount);
