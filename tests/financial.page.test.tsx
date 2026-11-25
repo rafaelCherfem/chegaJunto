@@ -7,7 +7,7 @@ vi.mock("@/hooks/usePassengers", () => ({ usePassengers: () => ({ data: [{ id: "
 vi.mock("@/hooks/useRides", () => ({ useRidesByPeriod: () => ({ data: [{ passengerId: "P", rideDate: "2026-10-05", rateCharged: 0.1 }, { passengerId: "P", rideDate: "2026-10-06", rateCharged: 0.2 }] }) }));
 vi.mock("@/hooks/useReceivedRides", () => ({ useReceivedRidesByPeriod: () => ({ data: [] }) }));
 vi.mock("@/hooks/useReceipt", () => ({ useGenerateReceipt: () => ({ mutateAsync: vi.fn() }) }));
-const payment = (id: string, revision: number, signedAmount: number) => ({ id, monthlyChargeId: "C", kind: "PAYMENT" as const, revision, signedAmount, relatedPaymentId: null });
+const payment = (id: string, revision: number, signedAmount: number) => ({ id, monthlyChargeId: "C", kind: "PAYMENT" as const, revision, signedAmount, relatedPaymentId: null, occurredAt: "2026-10-15T15:00:00Z" });
 const charge = { id: "C", passengerId: "P", periodStart: "2026-10-01", periodEnd: "2026-10-31", totalAmount: 0.3, paid: false, paidAmount: 0, revision: 7, activePaymentId: null };
 // A página abre no ciclo em aberto; as cobranças fechadas ficam um passo atrás na lista de ciclos.
 const renderClosedCycle = () => { render(<MonthlyClosingPage />); fireEvent.click(screen.getByLabelText("Ciclo anterior")); };

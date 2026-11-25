@@ -91,4 +91,6 @@ export interface ChargePaymentEvent {
   revision: number;
   signedAmount: number;
   relatedPaymentId: string | null;
+  /** Quando o evento foi gravado (timestamp do banco). */
+  occurredAt: string;
 }

@@ -76,6 +76,7 @@ const payment = (id: string, revision: number, signedAmount: number): ChargePaym
   revision,
   signedAmount,
   relatedPaymentId: null,
+  occurredAt: `2026-11-${String(10 + revision).padStart(2, "0")}T15:00:00Z`,
 });
 
 function setData({
@@ -293,7 +294,7 @@ describe("undo points at the latest payment still in force", () => {
   });
 
   it("skips a payment that was already cancelled", async () => {
-    const cancel: ChargePaymentEvent = { id: "x", monthlyChargeId: "CA", kind: "CANCEL", revision: 4, signedAmount: -30, relatedPaymentId: "e2" };
+    const cancel: ChargePaymentEvent = { id: "x", monthlyChargeId: "CA", kind: "CANCEL", revision: 4, signedAmount: -30, relatedPaymentId: "e2", occurredAt: "2026-11-14T15:00:00Z" };
     setData({ events: [...events, cancel], charges: [openCharge({ paidAmount: 50 })] });
     render(<MonthlyClosingPage />);
     const dialog = openDetails();

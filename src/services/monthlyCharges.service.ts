@@ -16,8 +16,8 @@ function paymentFailure(error: { code?: string; message?: string; hint?: string 
   if (error.code === "40001") return new StaleObligationError();
   return mapPaymentError(error) ?? mapCycleError(error) ?? new Error(errorMessages.unexpected);
 }
-// Quantos ids de cobrança vão em cada consulta de eventos (limite de tamanho da URL).
-const EVENT_CHUNK = 100;
+// Quantos ids de cobrança vão em cada consulta de eventos (tamanho da URL e limite de 1000 linhas por resposta).
+const EVENT_CHUNK = 40;
 export async function closeCycle(endDate: string, scope?: SessionScope): Promise<CycleSummaryRow[]> {
   assertCalendarDate(endDate);
   const signal = requestSignal(scope);
@@ -48,7 +48,7 @@ export async function listPaymentEventsForCharges(chargeIds: string[], scope?: S
   const signal = requestSignal(scope);
   const events: ChargePaymentEvent[] = [];
   for (let from = 0; from < chargeIds.length; from += EVENT_CHUNK) {
-    const { data, error } = await supabase.from("monthly_charge_events").select("id,monthly_charge_id,kind,revision,signed_amount,related_payment_id").in("monthly_charge_id", chargeIds.slice(from, from + EVENT_CHUNK)).in("kind", ["PAYMENT", "CANCEL"]).abortSignal(signal);
+    const { data, error } = await supabase.from("monthly_charge_events").select("id,monthly_charge_id,kind,revision,signed_amount,related_payment_id,occurred_at").in("monthly_charge_id", chargeIds.slice(from, from + EVENT_CHUNK)).in("kind", ["PAYMENT", "CANCEL"]).abortSignal(signal);
     scope?.assertCurrent();
     if (error) throw new Error(errorMessages.unexpected);
     events.push(...data.map(toChargePaymentEvent));
@@ -74,7 +74,7 @@ export async function listMonthlyCharges(referenceMonth: string, scope?: Session
 export async function listChargePaymentEvents(referenceMonth: string, scope?: SessionScope): Promise<ChargePaymentEvent[]> {
   assertReferenceMonth(referenceMonth);
   const signal = requestSignal(scope);
-  const { data, error } = await supabase.from("monthly_charge_events").select("id,monthly_charge_id,kind,revision,signed_amount,related_payment_id").eq("reference_month", referenceMonth).in("kind", ["PAYMENT", "CANCEL"]).abortSignal(signal);
+  const { data, error } = await supabase.from("monthly_charge_events").select("id,monthly_charge_id,kind,revision,signed_amount,related_payment_id,occurred_at").eq("reference_month", referenceMonth).in("kind", ["PAYMENT", "CANCEL"]).abortSignal(signal);
   scope?.assertCurrent();
   if (error) throw new Error(errorMessages.unexpected);
   return data.map(toChargePaymentEvent);
