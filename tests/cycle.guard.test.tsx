@@ -15,6 +15,7 @@ vi.mock("@/hooks/useMonthlyCharges", () => ({
   usePaymentEventsForCharges: () => ({ data: [] }),
   useMarkMonthlyChargePaid: () => ({ mutateAsync: vi.fn() }),
   useUnmarkMonthlyChargePaid: () => ({ mutateAsync: vi.fn() }),
+  useRegisterPayment: () => ({ mutateAsync: vi.fn() }),
   usePreviewCycle: () => ({ mutateAsync: mocks.preview }),
   useCloseCycle: () => ({ mutateAsync: mocks.close }),
 }));

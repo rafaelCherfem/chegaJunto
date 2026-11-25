@@ -2,7 +2,7 @@ import { assertCalendarDate, assertReferenceMonth } from "@/utils/date";
 import { requestSignal, type SessionScope } from "@/lib/sessionScope";
 import { errorMessages } from "@/constants/errorMessages";
 import { loadErrorFrom } from "@/lib/loadErrors";
-import { mapCycleError, mapPaymentError, StaleObligationError } from "@/lib/cycleErrors";
+import { mapCycleError, mapPaymentError, PAYMENT_UNAVAILABLE, StaleObligationError } from "@/lib/cycleErrors";
 import { toChargePaymentEvent, toCycleSummaryRow, toMonthlyCharge } from "@/lib/mappers";
 import { supabase } from "@/lib/supabase";
 import type { ChargePaymentEvent, CycleSummaryRow, MonthlyCharge } from "@/types/entities";
@@ -14,6 +14,8 @@ function financialError(error: { code?: string; message?: string; hint?: string 
 // register_payment: o HINT do banco (valor, teto) tem prioridade, inclusive no NO_OBLIGATION.
 function paymentFailure(error: { code?: string; message?: string; hint?: string | null }): Error {
   if (error.code === "40001") return new StaleObligationError();
+  // Função inexistente: o front foi publicado antes da migração 0015 chegar ao banco.
+  if (error.code === "PGRST202") return new Error(PAYMENT_UNAVAILABLE);
   return mapPaymentError(error) ?? mapCycleError(error) ?? new Error(errorMessages.unexpected);
 }
 // Quantos ids de cobrança vão em cada consulta de eventos (tamanho da URL e limite de 1000 linhas por resposta).

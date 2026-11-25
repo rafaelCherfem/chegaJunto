@@ -51,6 +51,16 @@ describe("registerPayment", () => {
     expect(mocks.rpc.mock.calls[0]![1].payment_amount).toBe(12.34);
   });
 
+  it("a database without migration 0015 says the free payment is not available yet", async () => {
+    mocks.rpcResult.mockResolvedValue({
+      data: null,
+      error: { code: "PGRST202", message: "Could not find the function public.register_payment(expected_revision, payment_amount, target_charge) in the schema cache" },
+    });
+    await expect(registerPayment("C1", 10, 1)).rejects.toThrow(
+      "Pagamento livre ainda não está disponível. Tente de novo em instantes.",
+    );
+  });
+
   it("a stale revision asks the user to refresh", async () => {
     mocks.rpcResult.mockResolvedValue({ data: null, error: { code: "40001", message: "STALE_OBLIGATION" } });
     await expect(registerPayment("C1", 10, 1)).rejects.toThrow("cobrança mudou");

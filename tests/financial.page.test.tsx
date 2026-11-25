@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MonthlyClosingPage } from "@/pages/MonthlyClosingPage";
 const mocks = vi.hoisted(() => ({ pay: vi.fn(), cancel: vi.fn(), charges: vi.fn(), events: vi.fn() }));
-vi.mock("@/hooks/useMonthlyCharges", () => ({ useCycleCharges: mocks.charges, usePaymentEventsForCharges: mocks.events, useMarkMonthlyChargePaid: () => ({ mutateAsync: mocks.pay }), useUnmarkMonthlyChargePaid: () => ({ mutateAsync: mocks.cancel }), usePreviewCycle: () => ({ mutateAsync: vi.fn() }), useCloseCycle: () => ({ mutateAsync: vi.fn() }) }));
+vi.mock("@/hooks/useMonthlyCharges", () => ({ useCycleCharges: mocks.charges, usePaymentEventsForCharges: mocks.events, useMarkMonthlyChargePaid: () => ({ mutateAsync: mocks.pay }), useUnmarkMonthlyChargePaid: () => ({ mutateAsync: mocks.cancel }), useRegisterPayment: () => ({ mutateAsync: vi.fn() }), usePreviewCycle: () => ({ mutateAsync: vi.fn() }), useCloseCycle: () => ({ mutateAsync: vi.fn() }) }));
 vi.mock("@/hooks/usePassengers", () => ({ usePassengers: () => ({ data: [{ id: "P", name: "Pessoa" }] }) }));
 vi.mock("@/hooks/useRides", () => ({ useRidesByPeriod: () => ({ data: [{ passengerId: "P", rideDate: "2026-10-05", rateCharged: 0.1 }, { passengerId: "P", rideDate: "2026-10-06", rateCharged: 0.2 }] }) }));
 vi.mock("@/hooks/useReceivedRides", () => ({ useReceivedRidesByPeriod: () => ({ data: [] }) }));
