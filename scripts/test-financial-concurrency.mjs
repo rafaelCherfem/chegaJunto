@@ -43,7 +43,7 @@ function audit(label, revision, amount, paid, paymentCount, cancelCount, reopenC
  console.log(`${label} FINAL: revision=${c.revision}, amount=${c.total_amount}, paid=${c.paid}, active=${Boolean(c.active_payment_id)}, PAYMENT/CANCEL/REOPEN=${paymentCount}/${cancelCount}/${reopenCount}; immutable audit PASS`);
 }
 
-function cleanup(){sql(`update public.monthly_charges set active_payment_id=null where user_id='${owner}';delete from public.monthly_charge_events where user_id='${owner}';delete from public.monthly_charges where user_id='${owner}';delete from public.rides where user_id='${owner}';delete from public.received_rides where user_id='${owner}';delete from public.passengers where id in ('${passenger}','${passenger2}');delete from public.responsible_accounts where user_id='${owner}';delete from auth.users where id='${owner}';`);}
+function cleanup(){sql(`update public.monthly_charges set active_payment_id=null where user_id='${owner}';delete from public.monthly_charge_events where user_id='${owner}';delete from public.monthly_charges where user_id='${owner}';delete from public.rides where user_id='${owner}';delete from public.received_rides where user_id='${owner}';delete from public.passengers where id in ('${passenger}','${passenger2}') or user_id='${owner}';delete from public.responsible_accounts where user_id='${owner}';delete from auth.users where id='${owner}';`);}
 try{
  cleanup();sql(`insert into auth.users(id,email)values('${owner}','finance-race@example.test');insert into public.responsible_accounts(user_id)values('${owner}');insert into public.passengers(id,user_id,name,default_daily_rate)values('${passenger}','${owner}','Synthetic race',10);${auth}insert into public.rides(user_id,passenger_id,ride_date,rate_charged)values('${owner}','${passenger}','2025-01-01',10);`);
  let r=await race('A simultaneous closing',["select public.close_month('2025-01-01')","select public.close_month('2025-01-01')"]);
@@ -73,8 +73,8 @@ try{
  r=await race('H close_cycle versus close_cycle',["select * from public.close_cycle('2025-02-28')","select * from public.close_cycle('2025-02-28')"],['INVALID_CYCLE_END']);
  let cycles=cyclesOf();assert.equal(cycles.length,1,'H: duplicated cycle');assert.equal(cycles[0].period_start,'2025-02-10');assert.equal(cycles[0].period_end,'2025-02-28');assert.equal(cycles[0].total_amount,10);
  assert.equal(cycles[0].reference_month,cycles[0].period_start);
- // Saída do psql (-qAt): colunas separadas por '|' na ordem de close_cycle (passenger_id, status, reason, charge_id, period_start, period_end, total_amount).
- const rowsOf=x=>x.out.split('\n').map(l=>l.split('|')).filter(f=>f.length===7&&f[0]===passenger2);
+ // Saída do psql (-qAt): colunas separadas por '|' na ordem de close_cycle (passenger_id, status, reason, charge_id, period_start, period_end, total_amount, paid_amount, amount_due, refund_due).
+ const rowsOf=x=>x.out.split('\n').map(l=>l.split('|')).filter(f=>f.length===10&&f[0]===passenger2);
  const mine=r.map(rowsOf);assert.ok(mine.every(m=>m.length===1),'H: each session must return exactly one row for passenger 2');
  const rows=mine.map(m=>m[0]),closed=rows.filter(f=>f[1]==='CLOSED'),skipped=rows.filter(f=>f[1]==='SKIPPED');
  assert.equal(closed.length,1,'H: exactly one session must close the cycle');assert.equal(skipped.length,1,'H: exactly one session must be skipped');
@@ -101,5 +101,64 @@ try{
  assert.equal(new Set(cycles.map(x=>x.period_start)).size,cycles.length,'I: duplicated cycle');
  assert.equal(Number(sql(`select count(*) from public.monthly_charges a join public.monthly_charges b on a.passenger_id=b.passenger_id and a.id<b.id and daterange(a.period_start,a.period_end,'[]')&&daterange(b.period_start,b.period_end,'[]') where a.passenger_id='${passenger2}'`)),0,'I: overlapping cycles');
  console.log('H/I close_cycle races: no deadlock, no duplicated or overlapping cycle');
+ // J a M: register_payment (0015). Terceiro passageiro, abril de 2025, mesmo responsável.
+ const passenger3='92000000-0000-0000-0000-000000000003';
+ sql(`insert into public.passengers(id,user_id,name,default_daily_rate)values('${passenger3}','${owner}','Synthetic race 3',10);${auth}insert into public.rides(user_id,passenger_id,ride_date,rate_charged)values('${owner}','${passenger3}','2025-04-05',100);select public.close_month('2025-04-01');`);
+ const ch3=()=>JSON.parse(sql(`select row_to_json(c) from public.monthly_charges c where passenger_id='${passenger3}' order by period_end desc limit 1`));
+ const ev3=()=>JSON.parse(sql(`select coalesce(json_agg(e order by e.revision,e.occurred_at),'[]'::json) from public.monthly_charge_events e where e.passenger_id='${passenger3}'`));
+ const reg=(q,amount)=>`select public.register_payment('${q.id}',${amount},${q.revision})`;
+ const isStale=x=>x.code!==0&&x.err.includes('STALE_OBLIGATION');
+ // Coerência final: pago = pagamentos - cancelamentos, total = soma persistida, paid conforme charge_settled,
+ // uma revisão por pagamento, eventos nunca à frente da cobrança.
+ function coherent(label){
+  const c=ch3(),e=ev3(),sumOf=k=>e.filter(x=>x.kind===k).reduce((s,x)=>s+Number(x.signed_amount),0);
+  assert.equal(Number(c.paid_amount),sumOf('PAYMENT')-sumOf('CANCEL'),`${label}: paid_amount must be payments minus cancellations`);
+  const total=Number(sql(`select public.charge_period_total('${owner}','${passenger3}','${c.period_start}',${c.extensible?"date '9999-12-31'":`'${c.period_end}'::date`})`));
+  assert.equal(Number(c.total_amount),total,`${label}: stored total must match the persisted ledger`);
+  assert.equal(c.paid,Number(c.paid_amount)>=Number(c.total_amount),`${label}: paid must follow charge_settled`);
+  const revs=e.filter(x=>x.kind==='PAYMENT').map(x=>x.revision);assert.equal(new Set(revs).size,revs.length,`${label}: duplicate payment revision`);
+  assert.ok(e.every(x=>x.revision<=c.revision),`${label}: event ahead of the charge revision`);
+  assert.equal(e.filter(x=>x.kind==='REOPEN').length,0,`${label}: no REOPEN expected without an active payment`);
+  return c;
+ }
+ // J: duas sessões com a mesma revisão: uma passa, a outra cai em STALE_OBLIGATION.
+ let q=ch3();
+ r=await race('J register_payment versus register_payment',[reg(q,30),reg(q,30)]);
+ assert.equal(r.filter(x=>x.code===0).length,1,'J: exactly one session must register');assert.equal(r.filter(isStale).length,1,'J: the other must be STALE_OBLIGATION');
+ let after=coherent('J');assert.equal(Number(after.paid_amount),30);assert.equal(after.revision,q.revision+1);
+ assert.equal(ev3().filter(x=>x.kind==='PAYMENT').length,1,'J: exactly one PAYMENT');
+ console.log(`J order: session ${r.findIndex(x=>x.code===0)} registered first`);
+ // K: register_payment contra close_cycle (o ciclo é extensível; o encerramento sobe a revisão).
+ sql(`update public.monthly_charges set extensible=true where id='${q.id}'`);
+ q=ch3();
+ r=await race('K register_payment versus close_cycle',[reg(q,20),"select * from public.close_cycle('2025-05-10')"],['INVALID_CYCLE_END']);
+ assert.equal(r[1].code,0,'K: close_cycle must succeed');
+ after=coherent('K');assert.equal(after.period_end,'2025-05-10');assert.equal(after.extensible,false);
+ if(r[0].code===0){
+  console.log('K order: register first, then close_cycle');assert.equal(Number(after.paid_amount),Number(q.paid_amount)+20);assert.equal(after.revision,q.revision+2);
+ }else{
+  console.log('K order: close_cycle first, register with the old revision');assert.ok(isStale(r[0]),'K: old confirmation must be STALE_OBLIGATION');
+  assert.equal(Number(after.paid_amount),Number(q.paid_amount));assert.equal(after.revision,q.revision+1);
+ }
+ // L: register_payment contra insert de diária dentro do ciclo.
+ q=ch3();
+ r=await race('L register_payment versus ride insert',[reg(q,10),`insert into public.rides(user_id,passenger_id,ride_date,rate_charged)values('${owner}','${passenger3}','2025-05-03',40)`]);
+ assert.equal(r[1].code,0,'L: the ride insert must succeed');
+ after=coherent('L');assert.equal(Number(after.total_amount),Number(q.total_amount)+40);
+ if(r[0].code===0){
+  console.log('L order: register first, then insert');assert.equal(Number(after.paid_amount),Number(q.paid_amount)+10);assert.equal(after.revision,q.revision+2);
+ }else{
+  console.log('L order: insert first, register with the old revision');assert.ok(isStale(r[0]),'L: old confirmation must be STALE_OBLIGATION');
+  assert.equal(Number(after.paid_amount),Number(q.paid_amount));assert.equal(after.revision,q.revision+1);
+ }
+ // M: register_payment contra cancel_charge_payment do pagamento vigente mais recente.
+ q=ch3();
+ const target=JSON.parse(sql(`select row_to_json(e) from public.monthly_charge_events e where e.passenger_id='${passenger3}' and e.kind='PAYMENT' and not exists(select 1 from public.monthly_charge_events x where x.related_payment_id=e.id and x.kind='CANCEL') order by e.revision desc limit 1`));
+ r=await race('M register_payment versus cancel_charge_payment',[reg(q,10),`select public.cancel_charge_payment('${q.id}','${target.id}')`]);
+ assert.equal(r.filter(x=>x.code===0).length,1,'M: exactly one of the two must succeed');assert.equal(r.filter(isStale).length,1,'M: the other must be STALE_OBLIGATION');
+ after=coherent('M');assert.equal(after.revision,q.revision+1);
+ if(r[0].code===0){console.log('M order: register first, then the stale cancellation');assert.equal(Number(after.paid_amount),Number(q.paid_amount)+10);}
+ else{console.log('M order: cancellation first, then the stale register');assert.equal(Number(after.paid_amount),Number(q.paid_amount)-Number(target.signed_amount));}
+ console.log('J/K/L/M register_payment races: no deadlock, no duplicated payment, coherent final state');
  console.log('LOCAL financial concurrency PASS: A–G, final states and stale cancellation verified.');
 }finally{for(const child of children)if(child.exitCode===null)child.kill();cleanup();}

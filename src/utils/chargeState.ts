@@ -8,6 +8,8 @@ export interface ChargeStateInput {
   paidAmount?: number | undefined;
   paid: boolean;
   status: ChargeStatus;
+  /** Cobrança de ciclo em aberto (extensível): o total cresce até o encerramento. */
+  cycleOpen?: boolean | undefined;
 }
 
 // due: nada devolvido ainda; partial: devolução parcial; done: devolvida;
@@ -52,6 +54,7 @@ export function chargeState(input: ChargeStateInput) {
     refundCents,
     returnedCents: isRefund && paidCents < 0 ? -paidCents : 0,
     hasObligation,
+    cycleOpen: input.cycleOpen === true,
     // Algo ainda a resolver: valor a receber ou devolução em aberto (inclusive pago a mais).
     open: hasObligation && (!settled || refundCents > 0),
   };
@@ -72,20 +75,24 @@ export function pendingCents(input: ChargeStateInput): number {
 
 // Textos que dependem da direção do dinheiro: pagar (passageiro deve) ou devolver.
 export function chargeTexts(state: ChargeState) {
-  const { isRefund, partial, outstandingCents, refundCents, refundStatus } = state;
+  const { isRefund, partial, outstandingCents, refundCents, refundStatus, cycleOpen } = state;
   return {
     payLabel: isRefund
       ? partial
         ? `Devolver ${formatCurrency(refundCents / 100)}`
         : "Marcar como devolvido"
-      : partial
-        ? `Pagar ${formatCurrency(outstandingCents / 100)}`
-        : "Marcar como pago",
+      : cycleOpen
+        ? "Pagar tudo até hoje"
+        : partial
+          ? `Pagar ${formatCurrency(outstandingCents / 100)}`
+          : "Marcar como pago",
     unmarkLabel: isRefund ? "Desmarcar devolução" : "Desmarcar pagamento",
     settledText: isRefund
       ? "Devolução feita"
       : refundStatus === "overpaid"
         ? `Pago a mais · devolva ${formatCurrency(refundCents / 100)}`
-        : "Pagamento recebido",
+        : cycleOpen
+          ? "Em dia até hoje"
+          : "Pagamento recebido",
   };
 }

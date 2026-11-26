@@ -102,9 +102,13 @@ describe("no open cycle: every closed passenger is closed through today or later
     setData(seedCharges, seedPeople);
     render(<MonthlyClosingPage />);
     expect(calcButton().disabled).toBe(true);
-    // Última cobrança de mês inteiro: vale a explicação da proteção, não a de "fechados até".
-    expect(screen.getByText("O encerramento por data está sendo ajustado e volta em breve.")).toBeTruthy();
-    expect(screen.queryByText(/Todos os passageiros já estão fechados/)).toBeNull();
+    // A proteção de mês inteiro saiu: vale a explicação de "fechados até", e a do ajuste não existe mais.
+    expect(screen.queryByText("O encerramento por data está sendo ajustado e volta em breve.")).toBeNull();
+    expect(
+      screen.getByText(
+        "Todos os passageiros já estão fechados até 30/11/2026. Para fechar de novo, é preciso haver movimento novo.",
+      ),
+    ).toBeTruthy();
     fireEvent.click(calcButton());
     expect(screen.queryByRole("dialog")).toBeNull();
   });

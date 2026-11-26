@@ -63,7 +63,7 @@ const row = (passengerId: string, status: CycleStatus, extra: Partial<CycleSumma
   chargeId: null,
   periodStart: status === "SKIPPED" ? null : "2026-12-07",
   periodEnd: status === "SKIPPED" ? "2026-12-06" : TODAY,
-  totalAmount: status === "CLOSED" ? 10 : null,
+  totalAmount: status === "CLOSED" ? 10 : null, paidAmount: null, amountDue: null, refundDue: null,
   ...extra,
 });
 
@@ -85,7 +85,7 @@ function setData({ charges = closedCharges, rides = [ride("a-open", "A", "2026-1
 
 const openSheet = () => fireEvent.click(screen.getByRole("button", { name: "Calcular fechamento" }));
 const dateInput = () => screen.getByLabelText("Data final do ciclo") as HTMLInputElement;
-const closeButton = () => screen.getByRole("button", { name: "Fechar ciclo" }) as HTMLButtonElement;
+const closeButton = () => screen.getByRole("button", { name: "Encerrar ciclo" }) as HTMLButtonElement;
 const changeDate = (value: string) => fireEvent.change(dateInput(), { target: { value } });
 
 beforeEach(() => {
@@ -211,7 +211,7 @@ describe("the preview", () => {
   });
 });
 
-describe("the 'Fechar ciclo' button", () => {
+describe("the 'Encerrar ciclo' button", () => {
   it("is disabled until the preview comes back, then enabled", async () => {
     const pending = deferred<CycleSummaryRow[]>();
     mocks.preview.mockReturnValue(pending.promise);

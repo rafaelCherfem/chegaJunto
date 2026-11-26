@@ -4,12 +4,16 @@ export type Json =
 // Linha devolvida por close_cycle e preview_cycle.
 export interface CycleSummaryDbRow {
   passenger_id: string;
-  status: "CLOSED" | "SKIPPED" | "NO_MOVEMENT";
+  status: "CLOSED" | "SKIPPED" | "NO_MOVEMENT" | "EXTENDED";
   reason: string | null;
   charge_id: string | null;
   period_start: string | null;
   period_end: string | null;
   total_amount: number | null;
+  // Colunas da migração 0014. Opcionais porque um banco sem a 0014 não as devolve.
+  paid_amount?: number | null;
+  amount_due?: number | null;
+  refund_due?: number | null;
 }
 
 export interface Database {
@@ -94,6 +98,8 @@ export interface Database {
           paid_amount: number;
           paid_at: string | null;
           created_at: string;
+          // Migração 0014. Opcional: um banco sem a 0014 não devolve a coluna.
+          extensible?: boolean;
         };
         Insert: {
           id?: string;
@@ -257,6 +263,8 @@ export interface Database {
       close_cycle: { Args: { end_date: string }; Returns: CycleSummaryDbRow[] };
       preview_cycle: { Args: { end_date: string }; Returns: CycleSummaryDbRow[] };
       pay_charge: { Args: { target_charge: string; expected_revision: number }; Returns: Database["public"]["Tables"]["monthly_charges"]["Row"][] };
+      // Pagamento de valor livre (migração 0015).
+      register_payment: { Args: { target_charge: string; payment_amount: number; expected_revision: number }; Returns: Database["public"]["Tables"]["monthly_charges"]["Row"][] };
       cancel_charge_payment: { Args: { target_charge: string; target_payment: string }; Returns: Database["public"]["Tables"]["monthly_charges"]["Row"][] };
       is_responsible: { Args: Record<string, never>; Returns: boolean };
       create_passenger_invite: {

@@ -87,6 +87,7 @@ export function toMonthlyCharge(row: MonthlyChargeRow): MonthlyCharge {
     paidAmount: row.paid_amount,
     paidAt: row.paid_at,
     createdAt: row.created_at,
+    extensible: row.extensible ?? false,
   };
 }
 
@@ -99,5 +100,8 @@ export function toCycleSummaryRow(row: CycleSummaryDbRow): CycleSummaryRow {
     periodStart: row.period_start,
     periodEnd: row.period_end,
     totalAmount: row.total_amount,
+    paidAmount: row.paid_amount ?? null,
+    amountDue: row.amount_due ?? null,
+    refundDue: row.refund_due ?? null,
   };
 }

@@ -42,7 +42,8 @@ insert into public.passenger_accounts(user_id,passenger_id,owner_user_id) values
 
 -- Resultados das chamadas e fotografias, para comparar depois. Criadas antes de trocar de papel.
 create temporary table results(label text, passenger_id uuid, status text, reason text, charge_id uuid,
- period_start date, period_end date, total_amount numeric);
+ period_start date, period_end date, total_amount numeric,
+ paid_amount numeric, amount_due numeric, refund_due numeric);
 grant select,insert on results to authenticated;
 create temporary table snap(label text, charge jsonb, events jsonb);
 grant select,insert on snap to authenticated;

@@ -13,6 +13,8 @@ interface GenerateReceiptInput {
 export function useGenerateReceipt() {
   return usePrivateMutation({
     mutationFn: async ({ passenger, charge }: GenerateReceiptInput, scope) => {
+      // Ciclo em aberto: o total ainda cresce, então não existe comprovante final.
+      if (charge.extensible) throw new Error("Encerre o ciclo para gerar o comprovante.");
       // O comprovante cobre o período da própria cobrança, não o mês de calendário.
       const { periodStart, periodEnd } = charge;
       const [rides, receivedRides] = await Promise.all([

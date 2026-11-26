@@ -15,10 +15,17 @@ export interface CycleGroup {
   charges: MonthlyCharge[];
 }
 
+/** Cobranças em aberto (ciclo extensível): fazem parte do ciclo em aberto, não dos fechados. */
+export function extensibleCharges(charges: ReadonlyArray<MonthlyCharge>): MonthlyCharge[] {
+  return charges.filter((charge) => charge.extensible);
+}
+
 // As datas são AAAA-MM-DD, então a ordem do texto é a ordem do calendário.
+// Só entram ciclos fechados: a cobrança extensível aparece no ciclo em aberto.
 export function groupChargesByPeriodEnd(charges: ReadonlyArray<MonthlyCharge>): CycleGroup[] {
   const byEnd = new Map<string, MonthlyCharge[]>();
   for (const charge of charges) {
+    if (charge.extensible) continue;
     byEnd.set(charge.periodEnd, [...(byEnd.get(charge.periodEnd) ?? []), charge]);
   }
   return Array.from(byEnd, ([periodEnd, group]) => ({
@@ -31,10 +38,15 @@ export function groupChargesByPeriodEnd(charges: ReadonlyArray<MonthlyCharge>): 
   })).sort((a, b) => (a.periodEnd < b.periodEnd ? 1 : a.periodEnd > b.periodEnd ? -1 : 0));
 }
 
-/** Fim do último ciclo de cada passageiro que já fechou. */
+/**
+ * Fim do último ciclo de cada passageiro que já fechou. Quem tem um ciclo em aberto
+ * (extensível) não entra: o ciclo dele ainda não terminou.
+ */
 export function lastClosedEnds(charges: ReadonlyArray<MonthlyCharge>): Map<string, string> {
   const ends = new Map<string, string>();
+  const openPassengers = new Set(extensibleCharges(charges).map((charge) => charge.passengerId));
   for (const charge of charges) {
+    if (charge.extensible || openPassengers.has(charge.passengerId)) continue;
     const current = ends.get(charge.passengerId);
     if (current === undefined || charge.periodEnd > current) {
       ends.set(charge.passengerId, charge.periodEnd);
@@ -61,25 +73,6 @@ export function isWholeMonthPeriod(start: string, end: string): boolean {
   );
 }
 
-/**
- * Algum passageiro tem, como última cobrança (a de maior period_end), uma de mês inteiro.
- * Só a última de cada passageiro conta. Sem cobranças, não é o caso.
- * Proteção temporária: enquanto o encerramento por data não estende esse ciclo, fechar de novo
- * criaria um período novo por cima dele.
- */
-export function hasWholeMonthLastCharge(charges: ReadonlyArray<MonthlyCharge>): boolean {
-  const last = new Map<string, MonthlyCharge>();
-  for (const charge of charges) {
-    const current = last.get(charge.passengerId);
-    if (current === undefined || charge.periodEnd > current.periodEnd) {
-      last.set(charge.passengerId, charge);
-    }
-  }
-  return Array.from(last.values()).some((charge) =>
-    isWholeMonthPeriod(charge.periodStart, charge.periodEnd),
-  );
-}
-
 /** O maior fim de ciclo entre todos os passageiros, ou null se ninguém fechou. */
 export function latestClosedEnd(charges: ReadonlyArray<MonthlyCharge>): string | null {
   let latest: string | null = null;
@@ -95,7 +88,12 @@ export function latestClosedEnd(charges: ReadonlyArray<MonthlyCharge>): string |
  */
 export function openCycleStart(charges: ReadonlyArray<MonthlyCharge>, today: string): string | null {
   const lookback = openCycleLookback(charges);
-  return lookback !== null && lookback > today ? null : lookback;
+  let start = lookback !== null && lookback > today ? null : lookback;
+  // O ciclo extensível começa no início da própria cobrança.
+  for (const charge of extensibleCharges(charges)) {
+    if (start === null || charge.periodStart < start) start = charge.periodStart;
+  }
+  return start;
 }
 
 /**
@@ -107,6 +105,8 @@ export function hasNoOpenCycle(
   neverClosedIds: ReadonlyArray<string>,
   today: string,
 ): boolean {
+  // Um ciclo extensível é, por definição, um ciclo em aberto.
+  if (charges.some((charge) => charge.extensible)) return false;
   const lookback = openCycleLookback(charges);
   return lookback !== null && lookback > today && neverClosedIds.length === 0;
 }
@@ -131,13 +131,25 @@ export function closeCycleMinDate(
   movementPassengerIds: Iterable<string>,
   today: string,
 ): string | undefined {
+  // O banco recusa uma data anterior ao início de qualquer ciclo em aberto: este é o piso.
+  const open = extensibleCharges(charges);
+  let floor: string | undefined;
+  for (const charge of open) {
+    if (floor === undefined || charge.periodStart > floor) floor = charge.periodStart;
+  }
+  const atLeastFloor = (date: string | undefined): string | undefined =>
+    floor === undefined ? date : date === undefined || floor > date ? floor : date;
+
   const closed = new Set(charges.map((charge) => charge.passengerId));
   for (const id of movementPassengerIds) {
-    if (!closed.has(id)) return undefined;
+    if (!closed.has(id)) return atLeastFloor(undefined);
   }
+  // A menor data útil: o dia seguinte ao fim de quem já fechou, ou o início de quem está em aberto.
+  const candidates = open.map((charge) => charge.periodStart);
   const lookback = openCycleLookback(charges);
-  if (lookback === null) return undefined;
-  return lookback > today ? today : lookback;
+  if (lookback !== null) candidates.push(lookback > today ? today : lookback);
+  if (candidates.length === 0) return undefined;
+  return atLeastFloor(candidates.reduce((min, date) => (date < min ? date : min)));
 }
 
 export interface PeriodTotals {
@@ -183,6 +195,8 @@ export interface OpenCycleRow {
   /** Início deste passageiro no ciclo em aberto. */
   start: string;
   totals: PeriodTotals;
+  /** Presente só no ciclo extensível: a cobrança gravada, cujo total já é o total vivo. */
+  charge?: MonthlyCharge;
 }
 
 export interface OpenCycle {
@@ -195,6 +209,8 @@ export interface OpenCycle {
  * Ciclo em aberto: o que veio depois do último fechamento de cada passageiro.
  * Início de quem já fechou = fim do último ciclo + 1; de quem nunca fechou = a primeira
  * diária ou compensação dele. Só entra quem tem movimento entre o início e hoje.
+ * Quem tem um ciclo extensível entra pela cobrança gravada (start = início do ciclo), com ou
+ * sem movimento, e nunca ganha uma prévia por cima.
  */
 export function buildOpenCycle(
   charges: ReadonlyArray<MonthlyCharge>,
@@ -212,7 +228,17 @@ export function buildOpenCycle(
   for (const received of receivedRides) note(received.passengerId, received.receivedDate);
 
   const rows: OpenCycleRow[] = [];
+  const extensible = new Map(extensibleCharges(charges).map((charge) => [charge.passengerId, charge]));
+  for (const [passengerId, charge] of extensible) {
+    rows.push({
+      passengerId,
+      start: charge.periodStart,
+      totals: periodTotals(rides, receivedRides, passengerId, charge.periodStart, today),
+      charge,
+    });
+  }
   for (const [passengerId, first] of firstMovement) {
+    if (extensible.has(passengerId)) continue;
     const lastEnd = ends.get(passengerId);
     const start = lastEnd === undefined ? first : nextDay(lastEnd);
     const totals = periodTotals(rides, receivedRides, passengerId, start, today);

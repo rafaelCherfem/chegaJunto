@@ -8,6 +8,7 @@ import {
   listPaymentEventsForCharges,
   markMonthlyChargePaid,
   previewCycle,
+  registerPayment,
   unmarkMonthlyChargePaid,
 } from "@/services/monthlyCharges.service";
 
@@ -77,6 +78,14 @@ export function useMarkMonthlyChargePaid() {
 export function useUnmarkMonthlyChargePaid() {
   return usePrivateMutation({
     mutationFn: ({ id, paymentId }: { id: string; paymentId: string }, scope) => unmarkMonthlyChargePaid(id, paymentId, scope),
+    invalidate: monthlyChargesKey,
+  });
+}
+
+export function useRegisterPayment() {
+  return usePrivateMutation({
+    mutationFn: ({ id, amount, revision }: { id: string; amount: number; revision: number }, scope) =>
+      registerPayment(id, amount, revision, scope),
     invalidate: monthlyChargesKey,
   });
 }

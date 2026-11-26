@@ -34,6 +34,8 @@ export function ChargeSheet({ monthLabel, open, onOpenChange, ...props }: Charge
   // parcial: canUnmarkPaid já vem de latestOpenPayment, igual à regra do banco.
   const showUnmark = closed && hasObligation && props.canUnmarkPaid === true;
   const hasRides = toCents(props.rideAmount) !== 0;
+  // Ciclo em aberto: o comprovante só sai depois de encerrar (o total ainda cresce).
+  const receiptBlocked = props.cycleOpen === true;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -95,7 +97,7 @@ export function ChargeSheet({ monthLabel, open, onOpenChange, ...props }: Charge
           )}
           {paidCents > 0 && (
             <div>
-              <dt>Já pago</dt>
+              <dt>{state.cycleOpen ? "Pago até agora" : "Já pago"}</dt>
               <dd>{formatCurrency(paidCents / 100)}</dd>
             </div>
           )}
@@ -132,17 +134,28 @@ export function ChargeSheet({ monthLabel, open, onOpenChange, ...props }: Charge
           )}
           <Button
             variant="outline"
-            disabled={props.generatingReceipt || props.status === "outdated"}
+            disabled={props.generatingReceipt || props.status === "outdated" || receiptBlocked}
             aria-busy={props.generatingReceipt}
+            aria-describedby={receiptBlocked ? "receipt-blocked" : undefined}
             onClick={props.onGenerateReceipt}
           >
             <FileText className="h-4 w-4 shrink-0" aria-hidden="true" />
             Gerar comprovante
           </Button>
         </div>
+        {receiptBlocked && (
+          <p id="receipt-blocked" className="mt-2 text-sm text-muted-foreground">
+            Encerre o ciclo para gerar o comprovante.
+          </p>
+        )}
 
         {showUnmark && (
           <div className="sheet__undo">
+            {props.undoAmount !== undefined && (
+              <p className="mb-1 text-sm tabular-nums text-muted-foreground">
+                Desfaz o último pagamento: {formatCurrency(props.undoAmount)}
+              </p>
+            )}
             <Button
               variant="ghost"
               size="sm"

@@ -4,11 +4,11 @@ import { addCents, toCents } from "@/utils/money";
 // Same rule as public.charge_live_payments (migration 0010): uncancelled
 // payments, newest first, until the running sum matches the amount received.
 // The database still has the final word when cancelling.
-export function latestOpenPayment(
+export function latestOpenPaymentEvent(
   events: ReadonlyArray<ChargePaymentEvent>,
   chargeId: string,
   paidAmount: number,
-): string | null {
+): ChargePaymentEvent | null {
   const paidCents = toCents(paidAmount);
   if (paidCents === 0) return null;
 
@@ -29,7 +29,16 @@ export function latestOpenPayment(
   let runningTotal = 0;
   for (const payment of openPayments) {
     runningTotal = addCents(runningTotal, toCents(payment.signedAmount));
-    if (runningTotal === paidCents) return openPayments[0]!.id;
+    if (runningTotal === paidCents) return openPayments[0]!;
   }
   return null;
+}
+
+// Só o id do pagamento que o "Desfazer" cancela (o vigente mais recente).
+export function latestOpenPayment(
+  events: ReadonlyArray<ChargePaymentEvent>,
+  chargeId: string,
+  paidAmount: number,
+): string | null {
+  return latestOpenPaymentEvent(events, chargeId, paidAmount)?.id ?? null;
 }

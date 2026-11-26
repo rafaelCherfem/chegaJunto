@@ -1,3 +1,4 @@
+import { formatCurrency } from "@/utils/currency";
 import { formatIsoDatesInText } from "@/utils/date";
 
 // Erros do fechamento por ciclo (migrações 0012 e 0013). O banco manda o token na
@@ -50,4 +51,56 @@ export function mapCycleError(error: PostgrestLikeError): Error | null {
   if (!token) return null;
   const hint = typeof error.hint === "string" ? error.hint.trim() : "";
   return new Error(hint ? formatIsoDatesInText(hint) : ERRORS[token].fallback);
+}
+
+// A confirmação da tela ficou velha (o banco respondeu STALE_OBLIGATION, código 40001).
+// A tela reconhece este erro para recarregar os dados e avisar.
+export class StaleObligationError extends Error {
+  constructor() {
+    super("A cobrança mudou. Atualize os dados e repita a operação.");
+    this.name = "StaleObligationError";
+  }
+}
+
+// Erros do encerramento do ciclo em aberto e do pagamento de valor livre (migrações 0014 e 0015).
+// Ficam à parte de mapCycleError, que continua tratando só os cinco tokens do fechamento por ciclo.
+export type PaymentErrorToken =
+  | "EXTENSIBLE_CYCLE_OPEN"
+  | "INVALID_PAYMENT_AMOUNT"
+  | "NO_OBLIGATION"
+  | "PAYMENT_EXCEEDS_OUTSTANDING";
+
+const PAYMENT_ERRORS: Record<PaymentErrorToken, string> = {
+  EXTENSIBLE_CYCLE_OPEN:
+    "Existe um ciclo em aberto. Encerre o ciclo pela tela de cobranças antes de fechar um mês.",
+  INVALID_PAYMENT_AMOUNT: "Informe um valor maior que zero, com no máximo duas casas decimais.",
+  NO_OBLIGATION: "Não há nada a receber desta cobrança.",
+  PAYMENT_EXCEEDS_OUTSTANDING: "O valor é maior que o que falta receber.",
+};
+
+export function paymentErrorToken(error: PostgrestLikeError): PaymentErrorToken | null {
+  if (error.code !== "23514") return null;
+  const message = error.message ?? "";
+  for (const token of Object.keys(PAYMENT_ERRORS) as PaymentErrorToken[]) {
+    if (message.includes(token)) return token;
+  }
+  return null;
+}
+
+// O banco escreve o valor com ponto ("Falta receber 180.00."); na tela vira "R$ 180,00".
+function formatAmountsInText(text: string): string {
+  return text.replace(/(\d+)\.(\d{2})(?!\d)/g, (_, whole: string, cents: string) =>
+    formatCurrency(Number(`${whole}.${cents}`)),
+  );
+}
+
+/**
+ * Traduz os quatro erros novos. Devolve null para qualquer outro erro.
+ * Usa o hint do banco (datas e valores em formato brasileiro) e, sem ele, um texto fixo.
+ */
+export function mapPaymentError(error: PostgrestLikeError): Error | null {
+  const token = paymentErrorToken(error);
+  if (!token) return null;
+  const hint = typeof error.hint === "string" ? error.hint.trim() : "";
+  return new Error(hint ? formatAmountsInText(formatIsoDatesInText(hint)) : PAYMENT_ERRORS[token]);
 }

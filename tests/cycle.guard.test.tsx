@@ -64,38 +64,39 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 
-describe("the closing is blocked while the last charge is a whole month", () => {
-  it("the real risk: movement after the conversion month exists, and the button stays off", () => {
+describe("a whole-month last charge no longer blocks the closing (the deploy order protects)", () => {
+  it("movement after the conversion month exists: the button is on and there is no explanation of a block", async () => {
     setToday("2026-12-02");
     setData([charge("nov", "2026-11-01", "2026-11-30")], [ride("r1", "2026-12-01")]);
     render(<MonthlyClosingPage />);
     expect(screen.getByText("Ciclo em aberto: 01/12/2026 a hoje")).toBeTruthy();
-    expect(calcButton().disabled).toBe(true);
-    expect(screen.getByText(GUARD_TEXT)).toBeTruthy();
+    expect(calcButton().disabled).toBe(false);
+    expect(screen.queryByText(GUARD_TEXT)).toBeNull();
     fireEvent.click(calcButton());
-    expect(screen.queryByRole("dialog")).toBeNull();
-    expectNothingClosed();
+    expect(await screen.findByRole("dialog")).toBeTruthy();
+    expect(mocks.close).not.toHaveBeenCalled();
   });
 
-  it("also blocked with no open cycle (November before it ends)", () => {
+  it("with no open cycle (November before it ends) the button is off only because everyone is closed, and the text says so", () => {
     setToday("2026-11-23");
     setData([charge("nov", "2026-11-01", "2026-11-30")]);
     render(<MonthlyClosingPage />);
     expect(calcButton().disabled).toBe(true);
-    expect(screen.getByText(GUARD_TEXT)).toBeTruthy();
+    expect(screen.queryByText(GUARD_TEXT)).toBeNull();
+    expect(screen.getByText(/Todos os passageiros já estão fechados até 30\/11\/2026/)).toBeTruthy();
     fireEvent.click(calcButton());
     expect(screen.queryByRole("dialog")).toBeNull();
     expectNothingClosed();
   });
 
-  it("an open sheet closes by itself when the block starts to apply", async () => {
+  it("an open sheet closes by itself when the charges stop being available", async () => {
     setToday("2026-12-10");
     setData([charge("a", "2026-12-01", "2026-12-06")], [ride("r1", "2026-12-08")]);
     const { rerender } = render(<MonthlyClosingPage />);
     fireEvent.click(calcButton());
     expect(await screen.findByRole("dialog")).toBeTruthy();
 
-    setData([charge("a", "2026-12-01", "2026-12-31")], [ride("r1", "2026-12-08")]);
+    setData(undefined, [ride("r1", "2026-12-08")]);
     rerender(<MonthlyClosingPage />);
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(mocks.close).not.toHaveBeenCalled();
@@ -113,7 +114,7 @@ describe("the closing is blocked while the last charge is a whole month", () => 
   });
 });
 
-describe("the closing is not blocked", () => {
+describe("the closing is available in the other formats too", () => {
   it("last charge in another format (07/12 to 06/01)", async () => {
     setToday("2027-01-08");
     setData([charge("a", "2026-12-07", "2027-01-06")], [ride("r1", "2027-01-07")]);
@@ -152,7 +153,8 @@ describe("the notice about the last period", () => {
     expect(screen.getByText(NOTICE("30/11/2026"))).toBeTruthy();
     expect(screen.queryByText(/Sem ciclo em aberto/)).toBeNull();
     expect(screen.queryByText(/último fechamento/)).toBeNull();
-    expect(screen.queryByText(/Todos os passageiros já estão fechados/)).toBeNull();
+    // Sem a proteção de mês inteiro, a explicação de "fechados até" passa a aparecer junto do aviso.
+    expect(screen.getByText(/Todos os passageiros já estão fechados até 30\/11\/2026/)).toBeTruthy();
   });
 
   it("does not appear when there is an open cycle", () => {

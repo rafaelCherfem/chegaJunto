@@ -5,15 +5,17 @@ type BillingRow = {
   paidAmount?: number;
   paid: boolean;
   status: "closed" | "preview" | "outdated";
+  open?: boolean | undefined;
 };
 
 export function BillingSummary({ rows }: { rows: BillingRow[] }) {
   const obligations = rows
     .filter((row) => row.status === "closed")
-    .map(chargeState)
+    .map((row) => chargeState({ ...row, cycleOpen: row.open }))
     .filter((state) => state.hasObligation);
   const pending = obligations.filter((state) => state.open).length;
   const paid = obligations.length - pending;
+  const hasOpenCycle = rows.some((row) => row.open === true);
   const previews = rows.filter((row) => row.status === "preview").length;
   const outdated = rows.filter((row) => row.status === "outdated").length;
   return (
@@ -27,6 +29,7 @@ export function BillingSummary({ rows }: { rows: BillingRow[] }) {
           {pending} {pending === 1 ? "pendente" : "pendentes"}{" "}
           <span className="text-sm font-medium text-muted-foreground">
             · {paid} {paid === 1 ? "paga" : "pagas"}
+            {hasOpenCycle ? " até agora" : ""}
           </span>
         </p>
       </div>
