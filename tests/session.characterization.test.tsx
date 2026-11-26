@@ -56,7 +56,7 @@ vi.mock("@/services/receivedRides.service", () => ({
   listReceivedRidesByMonth: mocks.list,
   listReceivedRidesByPeriod: mocks.list,
 }));
-vi.mock("@/services/monthlyCharges.service", () => ({ listMonthlyCharges: mocks.list }));
+vi.mock("@/services/monthlyCharges.service", () => ({ listMonthlyCharges: mocks.list, listPaymentEventsForCharges: mocks.list }));
 vi.mock("@/services/rideFlags.service", () => ({ listUnresolvedFlags: mocks.list }));
 vi.mock("@/services/auth.service", () => ({ signOut: vi.fn() }));
 vi.mock("@/pages/PassengerPortalPage", () => ({

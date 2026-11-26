@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toCents } from "@/utils/money";
 import { ChargeSheet } from "@/components/charges/ChargeSheet";
+import type { SheetPayment } from "@/components/charges/PaymentHistory";
 import { CloseCycleSheet } from "@/components/charges/CloseCycleSheet";
 import {
   MonthlyChargeCard,
@@ -13,13 +14,14 @@ import {
   useCycleCharges,
   useMarkMonthlyChargePaid,
   usePaymentEventsForCharges,
+  useRegisterPayment,
   useUnmarkMonthlyChargePaid,
 } from "@/hooks/useMonthlyCharges";
 import { usePassengers } from "@/hooks/usePassengers";
 import { useReceivedRidesByPeriod } from "@/hooks/useReceivedRides";
 import { useGenerateReceipt } from "@/hooks/useReceipt";
 import { useRidesByPeriod } from "@/hooks/useRides";
-import { latestOpenPaymentEvent } from "@/utils/chargePayments";
+import { livePayments } from "@/utils/chargePayments";
 import { pendingCents } from "@/utils/chargeState";
 import {
   buildOpenCycle,
@@ -151,6 +153,7 @@ export function MonthlyClosingPage() {
 
   const markPaid = useMarkMonthlyChargePaid();
   const unmarkPaid = useUnmarkMonthlyChargePaid();
+  const registerPayment = useRegisterPayment();
   const generateReceipt = useGenerateReceipt();
 
   const [togglingId, setTogglingId] = useState<string | null>(null);
@@ -264,14 +267,16 @@ export function MonthlyClosingPage() {
 
   // Uma operação de pagamento por vez. Se o banco disser que a cobrança mudou (STALE_OBLIGATION),
   // a tela recarrega os dados e avisa; nada foi gravado.
-  async function runPaymentAction(chargeId: string, action: () => Promise<unknown>) {
-    if (actionRef.current) return;
+  // Devolve true quando a operação foi gravada.
+  async function runPaymentAction(chargeId: string, action: () => Promise<unknown>): Promise<boolean> {
+    if (actionRef.current) return false;
     actionRef.current = true;
     setActionError(null);
     setTogglingId(chargeId);
 
     try {
       await action();
+      return true;
     } catch (error) {
       if (error instanceof StaleObligationError) {
         setActionError(STALE_NOTICE);
@@ -282,6 +287,7 @@ export function MonthlyClosingPage() {
           error instanceof Error ? error.message : "Não foi possível atualizar o pagamento.",
         );
       }
+      return false;
     } finally {
       actionRef.current = false;
       setTogglingId(null);
@@ -290,6 +296,12 @@ export function MonthlyClosingPage() {
 
   function handleMarkPaid(chargeId: string, revision: number) {
     return runPaymentAction(chargeId, () => markPaid.mutateAsync({ id: chargeId, revision }));
+  }
+
+  function handleRegisterPayment(chargeId: string, revision: number, amount: number) {
+    return runPaymentAction(chargeId, () =>
+      registerPayment.mutateAsync({ id: chargeId, amount, revision }),
+    );
   }
 
   function handleUnmarkPaid(chargeId: string, paymentId: string) {
@@ -342,7 +354,7 @@ export function MonthlyClosingPage() {
     }
 
     const outdated = !amountsMatch(stored.totalAmount, computed);
-    const undoEvent = latestOpenPaymentEvent(paymentEvents ?? [], stored.id, stored.paidAmount);
+    const undoEvent = livePayments(paymentEvents ?? [], stored.id, stored.paidAmount)[0];
     const cancelablePaymentId = undoEvent?.id ?? null;
 
     return {
@@ -365,6 +377,21 @@ export function MonthlyClosingPage() {
         cancelablePaymentId && handleUnmarkPaid(stored.id, cancelablePaymentId),
       onGenerateReceipt: () => passenger && handleGenerateReceipt(passenger, stored),
       onOpenDetails: () => setSelected({ id: item.passengerId, key: activeKey }),
+    };
+  }
+
+  // Histórico e formulário do sheet: só existem para a cobrança já gravada.
+  function sheetExtras(item: CycleItem) {
+    const stored = item.charge;
+    if (!stored) return { payments: [] as SheetPayment[], onRegisterPayment: undefined, actionError };
+    return {
+      payments: livePayments(paymentEvents ?? [], stored.id, stored.paidAmount).map((event) => ({
+        id: event.id,
+        occurredAt: event.occurredAt,
+        amount: event.signedAmount,
+      })),
+      onRegisterPayment: (amount: number) => handleRegisterPayment(stored.id, stored.revision, amount),
+      actionError,
     };
   }
 
@@ -437,7 +464,7 @@ export function MonthlyClosingPage() {
         </p>
       )}
 
-      {actionError && (
+      {actionError && !selectedItem && (
         <p role="alert" className="text-sm text-destructive">
           {actionError}
         </p>
@@ -515,6 +542,7 @@ export function MonthlyClosingPage() {
       {selectedItem && (
         <ChargeSheet
           {...chargeProps(selectedItem)}
+          {...sheetExtras(selectedItem)}
           monthLabel={sheetLabel(selectedItem)}
           open
           onOpenChange={(open) => !open && setSelected(null)}

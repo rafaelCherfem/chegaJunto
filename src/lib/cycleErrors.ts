@@ -53,6 +53,9 @@ export function mapCycleError(error: PostgrestLikeError): Error | null {
   return new Error(hint ? formatIsoDatesInText(hint) : ERRORS[token].fallback);
 }
 
+// register_payment ainda não existe no banco (PGRST202): o front saiu antes da migração 0015.
+export const PAYMENT_UNAVAILABLE = "Pagamento livre ainda não está disponível. Tente de novo em instantes.";
+
 // A confirmação da tela ficou velha (o banco respondeu STALE_OBLIGATION, código 40001).
 // A tela reconhece este erro para recarregar os dados e avisar.
 export class StaleObligationError extends Error {

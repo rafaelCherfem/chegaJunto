@@ -155,7 +155,7 @@ describe("listCycleCharges", () => {
 });
 
 describe("listPaymentEventsForCharges", () => {
-  const event = { id: "E1", monthly_charge_id: "C1", kind: "PAYMENT", revision: 1, signed_amount: 90, related_payment_id: null };
+  const event = { id: "E1", monthly_charge_id: "C1", kind: "PAYMENT", revision: 1, signed_amount: 90, related_payment_id: null, occurred_at: "2026-11-20T15:00:00Z" };
 
   it("filters by charge ids and by payment kinds, not by reference month", async () => {
     mocks.result.mockReturnValue({ data: [event], error: null });
@@ -164,7 +164,7 @@ describe("listPaymentEventsForCharges", () => {
     expect(spy("in")).toHaveBeenNthCalledWith(1, "monthly_charge_id", ["C1", "C2"]);
     expect(spy("in")).toHaveBeenNthCalledWith(2, "kind", ["PAYMENT", "CANCEL"]);
     expect(spy("eq")).not.toHaveBeenCalled();
-    expect(result).toEqual([{ id: "E1", monthlyChargeId: "C1", kind: "PAYMENT", revision: 1, signedAmount: 90, relatedPaymentId: null }]);
+    expect(result).toEqual([{ id: "E1", monthlyChargeId: "C1", kind: "PAYMENT", revision: 1, signedAmount: 90, relatedPaymentId: null, occurredAt: "2026-11-20T15:00:00Z" }]);
   });
 
   it("makes no query when there are no charges", async () => {
@@ -172,13 +172,13 @@ describe("listPaymentEventsForCharges", () => {
     expect(mocks.from).not.toHaveBeenCalled();
   });
 
-  it("splits a long list in chunks of 100 and joins the answers", async () => {
+  it("splits a long list in chunks of 40 and joins the answers", async () => {
     const ids = Array.from({ length: 250 }, (_, i) => `C${i}`);
     mocks.result.mockReturnValue({ data: [event], error: null });
     const result = await listPaymentEventsForCharges(ids);
     const chunks = spy("in").mock.calls.filter(([column]) => column === "monthly_charge_id").map(([, list]) => (list as string[]).length);
-    expect(chunks).toEqual([100, 100, 50]);
-    expect(result).toHaveLength(3);
+    expect(chunks).toEqual([40, 40, 40, 40, 40, 40, 10]);
+    expect(result).toHaveLength(7);
   });
 
   it("fails with the generic message when a chunk fails", async () => {

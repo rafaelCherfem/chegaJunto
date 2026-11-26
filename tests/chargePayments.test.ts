@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ChargePaymentEvent } from "@/types/entities";
-import { latestOpenPayment } from "@/utils/chargePayments";
+import { latestOpenPayment, livePayments } from "@/utils/chargePayments";
 
 const payment = (id: string, revision: number, signedAmount: number, chargeId = "C"): ChargePaymentEvent => ({
   id,
@@ -9,6 +9,7 @@ const payment = (id: string, revision: number, signedAmount: number, chargeId = 
   revision,
   signedAmount,
   relatedPaymentId: null,
+  occurredAt: `2026-11-${String(10 + revision).padStart(2, "0")}T15:00:00Z`,
 });
 const cancel = (paymentId: string, revision: number, signedAmount: number): ChargePaymentEvent => ({
   id: `cancel-${paymentId}`,
@@ -17,6 +18,7 @@ const cancel = (paymentId: string, revision: number, signedAmount: number): Char
   revision,
   signedAmount,
   relatedPaymentId: paymentId,
+  occurredAt: `2026-11-${String(10 + revision).padStart(2, "0")}T15:00:00Z`,
 });
 
 // Production history: the first 15 was zeroed by the old REOPEN (0008).
@@ -57,5 +59,46 @@ describe("latest open payment", () => {
 
   it("works for negative months, where the responsible account pays the passenger", () => {
     expect(latestOpenPayment([payment("a", 1, -10), payment("b", 3, -5)], "C", -15)).toBe("b");
+  });
+});
+
+const ids = (events: ChargePaymentEvent[]) => events.map((event) => event.id);
+
+describe("live payments (same rule as charge_live_payments)", () => {
+  it("lists the window from the newest payment down to where the sum closes", () => {
+    expect(ids(livePayments(legacy, "C", 27))).toEqual(["p15-new", "p12"]);
+    expect(ids(livePayments(legacy, "C", 42))).toEqual(["p15-new", "p12", "p15-old"]);
+  });
+
+  it("never reaches the payment zeroed by the old REOPEN", () => {
+    expect(ids(livePayments(legacy, "C", 27))).not.toContain("p15-old");
+  });
+
+  it("drops cancelled payments and follows the undo chain", () => {
+    const afterUndo = [...legacy, cancel("p15-new", 5, 15)];
+    expect(ids(livePayments(afterUndo, "C", 12))).toEqual(["p12"]);
+    expect(livePayments([...afterUndo, cancel("p12", 6, 12)], "C", 0)).toEqual([]);
+  });
+
+  it("is empty when nothing was received or the sum never closes", () => {
+    expect(livePayments(legacy, "C", 0)).toEqual([]);
+    expect(livePayments(legacy, "C", 20)).toEqual([]);
+    expect(livePayments([], "C", 10)).toEqual([]);
+  });
+
+  it("ignores REOPEN events (audit only after 0009) and other charges", () => {
+    const reopen: ChargePaymentEvent = { ...payment("r", 5, 27), kind: "REOPEN", relatedPaymentId: "p15-new" };
+    expect(ids(livePayments([...legacy, reopen, payment("other", 9, 5, "D")], "C", 27))).toEqual(["p15-new", "p12"]);
+  });
+
+  it("keeps the payment dates, so the screen can say when each one happened", () => {
+    expect(livePayments(legacy, "C", 27).map((event) => event.occurredAt)).toEqual([
+      "2026-11-14T15:00:00Z",
+      "2026-11-13T15:00:00Z",
+    ]);
+  });
+
+  it("the first of the list is the one the undo cancels", () => {
+    expect(latestOpenPayment(legacy, "C", 27)).toBe(livePayments(legacy, "C", 27)[0]!.id);
   });
 });

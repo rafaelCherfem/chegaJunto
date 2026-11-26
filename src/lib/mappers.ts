@@ -16,7 +16,7 @@ type MonthlyChargeRow = Database["public"]["Tables"]["monthly_charges"]["Row"];
 type PassengerInviteRow = Database["public"]["Tables"]["passenger_invites"]["Row"];
 type ChargePaymentEventRow = Pick<
   Database["public"]["Tables"]["monthly_charge_events"]["Row"],
-  "id" | "monthly_charge_id" | "kind" | "revision" | "signed_amount" | "related_payment_id"
+  "id" | "monthly_charge_id" | "kind" | "revision" | "signed_amount" | "related_payment_id" | "occurred_at"
 >;
 
 export function toPassenger(row: PassengerRow): Passenger {
@@ -70,6 +70,7 @@ export function toChargePaymentEvent(row: ChargePaymentEventRow): ChargePaymentE
     revision: row.revision,
     signedAmount: row.signed_amount,
     relatedPaymentId: row.related_payment_id,
+    occurredAt: row.occurred_at,
   };
 }
 

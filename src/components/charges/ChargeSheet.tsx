@@ -1,8 +1,13 @@
 import { Check, FileText, Undo2 } from "lucide-react";
+import type { CSSProperties } from "react";
 import type { MonthlyChargeCardProps } from "@/components/charges/MonthlyChargeCard";
+import { PaymentHistory, type SheetPayment } from "@/components/charges/PaymentHistory";
 import { RefundChip } from "@/components/charges/RefundChip";
+import { RegisterPaymentForm } from "@/components/charges/RegisterPaymentForm";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
+import { useKeyboardInset } from "@/hooks/useKeyboardInset";
+import { paymentDate } from "@/utils/chargePayments";
 import { chargeState, chargeTexts } from "@/utils/chargeState";
 import { formatCurrency } from "@/utils/currency";
 import { debtLabel, toCents } from "@/utils/money";
@@ -11,9 +16,24 @@ interface ChargeSheetProps extends Omit<MonthlyChargeCardProps, "onOpenDetails">
   monthLabel: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Pagamentos vigentes, do mais recente (o que o "Desfazer" cancela) para o mais antigo. */
+  payments?: ReadonlyArray<SheetPayment> | undefined;
+  /** Registra um pagamento de valor livre. Devolve true quando gravou. Sem ele não há formulário. */
+  onRegisterPayment?: ((amount: number) => Promise<boolean>) | undefined;
+  /** Erro da última ação, mostrado aqui porque o da página fica atrás do overlay. */
+  actionError?: string | null | undefined;
 }
 
-export function ChargeSheet({ monthLabel, open, onOpenChange, ...props }: ChargeSheetProps) {
+export function ChargeSheet({
+  monthLabel,
+  open,
+  onOpenChange,
+  payments,
+  onRegisterPayment,
+  actionError,
+  ...props
+}: ChargeSheetProps) {
+  const keyboardInset = useKeyboardInset();
   const state = chargeState(props);
   const {
     settled,
@@ -36,10 +56,25 @@ export function ChargeSheet({ monthLabel, open, onOpenChange, ...props }: Charge
   const hasRides = toCents(props.rideAmount) !== 0;
   // Ciclo em aberto: o comprovante só sai depois de encerrar (o total ainda cresce).
   const receiptBlocked = props.cycleOpen === true;
+  // O teto do valor livre é o que falta; o banco confere de novo (e recusa se passar).
+  const showRegister =
+    onRegisterPayment !== undefined &&
+    closed &&
+    !settled &&
+    cents > 0 &&
+    outstandingCents > 0;
+  const undoPayment = payments?.[0];
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent>
+      <SheetContent
+        // O foco inicial vai para o próprio sheet: sem isso o Radix focaria o campo de valor
+        // e abriria o teclado do celular sem ninguém ter tocado nele.
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          (event.currentTarget as HTMLElement).focus();
+        }}
+        style={keyboardInset > 0 ? ({ "--kb": `${keyboardInset}px` } as CSSProperties) : undefined}>
         <header className="sheet__header pr-12">
           <p className="stat-label">Cobrança · {monthLabel}</p>
           <SheetTitle className="mt-1.5 break-words text-xl font-extrabold [overflow-wrap:anywhere]">
@@ -122,6 +157,16 @@ export function ChargeSheet({ monthLabel, open, onOpenChange, ...props }: Charge
           </p>
         )}
 
+        <PaymentHistory payments={payments ?? []} refund={isRefund} />
+
+        {showRegister && onRegisterPayment && (
+          <RegisterPaymentForm
+            outstandingCents={outstandingCents}
+            disabled={props.toggling}
+            onRegister={onRegisterPayment}
+          />
+        )}
+
         <div className="sheet__actions">
           {showPay && (
             <Button
@@ -149,12 +194,25 @@ export function ChargeSheet({ monthLabel, open, onOpenChange, ...props }: Charge
           </p>
         )}
 
+        {actionError && (
+          <p role="alert" className="mt-3 text-sm text-destructive">
+            {actionError}
+          </p>
+        )}
+
         {showUnmark && (
           <div className="sheet__undo">
-            {props.undoAmount !== undefined && (
+            {undoPayment ? (
               <p className="mb-1 text-sm tabular-nums text-muted-foreground">
-                Desfaz o último pagamento: {formatCurrency(props.undoAmount)}
+                Desfaz o pagamento de {paymentDate(undoPayment.occurredAt)}:{" "}
+                {formatCurrency(isRefund ? Math.abs(undoPayment.amount) : undoPayment.amount)}
               </p>
+            ) : (
+              props.undoAmount !== undefined && (
+                <p className="mb-1 text-sm tabular-nums text-muted-foreground">
+                  Desfaz o último pagamento: {formatCurrency(props.undoAmount)}
+                </p>
+              )
             )}
             <Button
               variant="ghost"

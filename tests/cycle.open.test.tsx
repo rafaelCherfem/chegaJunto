@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   close: vi.fn(),
   pay: vi.fn(),
   unpay: vi.fn(),
+  registerPayment: vi.fn(),
   receipt: vi.fn(),
   refetchCharges: vi.fn(),
   refetchEvents: vi.fn(),
@@ -23,6 +24,7 @@ vi.mock("@/hooks/useMonthlyCharges", () => ({
   usePaymentEventsForCharges: mocks.events,
   useMarkMonthlyChargePaid: () => ({ mutateAsync: mocks.pay }),
   useUnmarkMonthlyChargePaid: () => ({ mutateAsync: mocks.unpay }),
+  useRegisterPayment: () => ({ mutateAsync: mocks.registerPayment }),
   usePreviewCycle: () => ({ mutateAsync: mocks.preview }),
   useCloseCycle: () => ({ mutateAsync: mocks.close }),
 }));
@@ -76,6 +78,7 @@ const payment = (id: string, revision: number, signedAmount: number): ChargePaym
   revision,
   signedAmount,
   relatedPaymentId: null,
+  occurredAt: `2026-11-${String(10 + revision).padStart(2, "0")}T15:00:00Z`,
 });
 
 function setData({
@@ -286,18 +289,18 @@ describe("undo points at the latest payment still in force", () => {
     setData({ events, charges: [openCharge({ paidAmount: 80 })] });
     render(<MonthlyClosingPage />);
     const dialog = openDetails();
-    expect(within(dialog).getByText(/Desfaz o último pagamento: R\$\s30,00/)).toBeTruthy();
+    expect(within(dialog).getByText(/Desfaz o pagamento de 13\/11\/2026: R\$\s30,00/)).toBeTruthy();
     fireEvent.click(within(dialog).getByRole("button", { name: "Desmarcar pagamento" }));
     await waitFor(() => expect(mocks.unpay).toHaveBeenCalledTimes(1));
     expect(mocks.unpay).toHaveBeenCalledWith({ id: "CA", paymentId: "e2" });
   });
 
   it("skips a payment that was already cancelled", async () => {
-    const cancel: ChargePaymentEvent = { id: "x", monthlyChargeId: "CA", kind: "CANCEL", revision: 4, signedAmount: -30, relatedPaymentId: "e2" };
+    const cancel: ChargePaymentEvent = { id: "x", monthlyChargeId: "CA", kind: "CANCEL", revision: 4, signedAmount: -30, relatedPaymentId: "e2", occurredAt: "2026-11-14T15:00:00Z" };
     setData({ events: [...events, cancel], charges: [openCharge({ paidAmount: 50 })] });
     render(<MonthlyClosingPage />);
     const dialog = openDetails();
-    expect(within(dialog).getByText(/Desfaz o último pagamento: R\$\s50,00/)).toBeTruthy();
+    expect(within(dialog).getByText(/Desfaz o pagamento de 11\/11\/2026: R\$\s50,00/)).toBeTruthy();
     fireEvent.click(within(dialog).getByRole("button", { name: "Desmarcar pagamento" }));
     await waitFor(() => expect(mocks.unpay).toHaveBeenCalledWith({ id: "CA", paymentId: "e1" }));
   });
@@ -475,5 +478,134 @@ describe("the confirmation for an open cycle", () => {
     fireEvent.click(screen.getByRole("button", { name: "Calcular fechamento" }));
     expect(await screen.findByText("Nada a fechar neste período")).toBeTruthy();
     expect((screen.getByRole("button", { name: "Encerrar ciclo" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+});
+
+describe("free payment in the sheet", () => {
+  // Ana: total 150, pago 80 (e1 50 em 11/11 + e2 30 em 13/11), faltam 70. Revisão 5.
+  const withHistory = () => setData({ events: [payment("e1", 1, 50), payment("e2", 3, 30)], charges: [openCharge({ paidAmount: 80 })] });
+  const amountField = (dialog: HTMLElement) => within(dialog).getByLabelText("Registrar pagamento") as HTMLInputElement;
+  const submitButton = (dialog: HTMLElement) => amountField(dialog).closest("form")!.querySelector("button[type=submit]") as HTMLButtonElement;
+
+  it("lists the payments in force, newest first, with their dates", () => {
+    withHistory();
+    render(<MonthlyClosingPage />);
+    const items = within(within(openDetails()).getByRole("region", { name: "Pagamentos registrados" })).getAllByRole("listitem");
+    expect(items.map((item) => item.textContent)).toEqual([
+      expect.stringMatching(/13\/11\/2026 · mais recenteR\$\s30,00/),
+      expect.stringMatching(/11\/11\/2026R\$\s50,00/),
+    ]);
+  });
+
+  it("registers the typed value with the charge id and the revision the screen saw", async () => {
+    withHistory();
+    mocks.registerPayment.mockResolvedValue({});
+    render(<MonthlyClosingPage />);
+    const dialog = openDetails();
+    expect(within(dialog).getByText(/^Falta R\$\s70,00$/)).toBeTruthy();
+    fireEvent.change(amountField(dialog), { target: { value: "20,5" } });
+    fireEvent.click(submitButton(dialog));
+    await waitFor(() => expect(mocks.registerPayment).toHaveBeenCalledTimes(1));
+    expect(mocks.registerPayment).toHaveBeenCalledWith({ id: "CA", amount: 20.5, revision: 5 });
+    expect(await within(dialog).findByText(/Pagamento de R\$\s20,50 registrado\./)).toBeTruthy();
+    expect(amountField(dialog).value).toBe("");
+  });
+
+  it("never sends a value above what is missing", () => {
+    withHistory();
+    render(<MonthlyClosingPage />);
+    const dialog = openDetails();
+    fireEvent.change(amountField(dialog), { target: { value: "70,01" } });
+    expect(within(dialog).getByRole("alert").textContent).toMatch(/O valor é maior que o que falta \(R\$\s70,00\)\./);
+    expect(submitButton(dialog).disabled).toBe(true);
+    fireEvent.submit(amountField(dialog).closest("form")!);
+    expect(mocks.registerPayment).not.toHaveBeenCalled();
+  });
+
+  it("a double submit registers once", async () => {
+    withHistory();
+    const pending = deferred<unknown>();
+    mocks.registerPayment.mockReturnValue(pending.promise);
+    render(<MonthlyClosingPage />);
+    const dialog = openDetails();
+    fireEvent.change(amountField(dialog), { target: { value: "10" } });
+    const form = amountField(dialog).closest("form")!;
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+    expect(mocks.registerPayment).toHaveBeenCalledTimes(1);
+    pending.resolve({});
+    await waitFor(() => expect(submitButton(dialog).getAttribute("aria-busy")).toBe("false"));
+  });
+
+  it("STALE_OBLIGATION: reloads, warns inside the sheet and keeps the typed value", async () => {
+    withHistory();
+    mocks.registerPayment.mockRejectedValue(new StaleObligationError());
+    render(<MonthlyClosingPage />);
+    const dialog = openDetails();
+    fireEvent.change(amountField(dialog), { target: { value: "10" } });
+    fireEvent.click(submitButton(dialog));
+    const alert = await within(dialog).findByRole("alert");
+    expect(alert.textContent).toBe("A cobrança mudou e a tela foi atualizada. Confira os valores e repita a operação.");
+    expect(mocks.refetchCharges).toHaveBeenCalledTimes(1);
+    expect(mocks.refetchEvents).toHaveBeenCalledTimes(1);
+    expect(amountField(dialog).value).toBe("10");
+  });
+
+  it("a database error shows its own message, with the amount from the HINT, inside the sheet", async () => {
+    withHistory();
+    mocks.registerPayment.mockRejectedValue(new Error("O valor é maior que o que falta receber. Falta receber R$ 70,00."));
+    render(<MonthlyClosingPage />);
+    const dialog = openDetails();
+    fireEvent.change(amountField(dialog), { target: { value: "10" } });
+    fireEvent.click(submitButton(dialog));
+    expect((await within(dialog).findByRole("alert")).textContent).toBe("O valor é maior que o que falta receber. Falta receber R$ 70,00.");
+    expect(mocks.refetchCharges).not.toHaveBeenCalled();
+    // O erro mora no sheet; a página de trás não repete o alerta.
+    expect(document.querySelectorAll('[role="alert"]')).toHaveLength(1);
+  });
+
+  it("payment and undo errors also show inside the sheet", async () => {
+    withHistory();
+    mocks.unpay.mockRejectedValue(new Error("Não foi possível atualizar o pagamento."));
+    render(<MonthlyClosingPage />);
+    const dialog = openDetails();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Desmarcar pagamento" }));
+    expect((await within(dialog).findByRole("alert")).textContent).toBe("Não foi possível atualizar o pagamento.");
+  });
+
+  it("is off while the data is being refreshed, and nothing is sent", () => {
+    setData({ events: [payment("e1", 1, 80)], charges: [openCharge({ paidAmount: 80 })], fetching: true });
+    render(<MonthlyClosingPage />);
+    const dialog = openDetails();
+    fireEvent.change(amountField(dialog), { target: { value: "10" } });
+    expect(submitButton(dialog).disabled).toBe(true);
+  });
+
+  it("registering and then undoing goes through the data that came back from the reload", async () => {
+    mocks.registerPayment.mockResolvedValue({});
+    setData({ events: [payment("e1", 1, 80)], charges: [openCharge({ paidAmount: 80 })] });
+    const view = render(<MonthlyClosingPage />);
+    const dialog = openDetails();
+    fireEvent.change(amountField(dialog), { target: { value: "10" } });
+    fireEvent.click(submitButton(dialog));
+    await waitFor(() => expect(mocks.registerPayment).toHaveBeenCalled());
+    // A recarga trouxe o pagamento novo (revisão 6): é ele que o "Desfazer" aponta.
+    setData({ events: [payment("e1", 1, 80), payment("e3", 6, 10)], charges: [openCharge({ paidAmount: 90, revision: 6 })] });
+    view.rerender(<MonthlyClosingPage />);
+    expect(within(dialog).getByText(/Desfaz o pagamento de 16\/11\/2026: R\$\s10,00/)).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Desmarcar pagamento" }));
+    await waitFor(() => expect(mocks.unpay).toHaveBeenCalledWith({ id: "CA", paymentId: "e3" }));
+  });
+
+  it("a settled cycle has no form", () => {
+    setData({ events: [payment("e1", 1, 150)], charges: [openCharge({ paidAmount: 150, paid: true })] });
+    render(<MonthlyClosingPage />);
+    expect(within(openDetails()).queryByLabelText("Registrar pagamento")).toBeNull();
+  });
+
+  it("a negative total has no form either (nothing to receive)", () => {
+    setData({ charges: [openCharge({ totalAmount: -5, paidAmount: 0 })], rides: [ride("r1", "A", "2026-12-03", 0)] });
+    render(<MonthlyClosingPage />);
+    expect(within(openDetails()).queryByLabelText("Registrar pagamento")).toBeNull();
   });
 });
