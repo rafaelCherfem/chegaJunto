@@ -57,40 +57,44 @@ export function MonthlyChargeCard(props: MonthlyChargeCardProps) {
         >
           {initials(props.passengerName)}
         </span>
-        <p className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] text-base font-semibold leading-10">
+        <p className="min-w-0 flex-1 break-words text-base font-semibold leading-10">
           {props.passengerName}
         </p>
-        <div className="flex shrink-0 flex-wrap items-center gap-1.5 py-2.5">
-          {props.status !== "closed" && (
-            <span className="charge-status charge-status--neutral">
-              {props.status === "preview" ? "Prévia" : "Desatualizado"}
-            </span>
-          )}
-          {props.cycleOpen && (
-            <span className="charge-status charge-status--neutral">Ciclo em aberto</span>
-          )}
-          {(refundStatus === "due" || refundStatus === "overpaid") && <RefundChip />}
-          {settled && hasObligation && refundStatus === null && (
-            <span className="charge-status charge-status--paid">
-              <Check className="h-3.5 w-3.5" aria-hidden="true" />
-              {state.cycleOpen ? "Pago até agora" : "Pago"}
-            </span>
-          )}
-          {refundStatus === "done" && (
-            <span className="charge-status charge-status--paid">
-              <Check className="h-3.5 w-3.5" aria-hidden="true" />
-              Devolvido
-            </span>
-          )}
-          {partial && (
-            <span className="charge-status charge-status--pending">
-              {isRefund ? "Devolução parcial" : "Parcialmente pago"}
-            </span>
-          )}
-          {props.status === "closed" && !props.paid && !partial && !isRefund && cents !== 0 && (
+      </div>
+      <div className="mt-2.5 flex flex-wrap items-center gap-1.5 empty:hidden">
+        {props.status !== "closed" && (
+          <span className="charge-status charge-status--neutral">
+            {props.status === "preview" ? "Prévia" : "Desatualizado"}
+          </span>
+        )}
+        {props.cycleOpen && (
+          <span className="charge-status charge-status--neutral">Ciclo em aberto</span>
+        )}
+        {(refundStatus === "due" || refundStatus === "overpaid") && <RefundChip />}
+        {settled && hasObligation && refundStatus === null && (
+          <span className="charge-status charge-status--paid">
+            <Check className="h-3.5 w-3.5" aria-hidden="true" />
+            {state.cycleOpen ? "Pago até agora" : "Pago"}
+          </span>
+        )}
+        {refundStatus === "done" && (
+          <span className="charge-status charge-status--paid">
+            <Check className="h-3.5 w-3.5" aria-hidden="true" />
+            Devolvido
+          </span>
+        )}
+        {partial && (
+          <span className="charge-status charge-status--pending">
+            {isRefund ? "Devolução parcial" : "Parcialmente pago"}
+          </span>
+        )}
+        {props.status === "closed" &&
+          !props.paid &&
+          !partial &&
+          !isRefund &&
+          cents !== 0 && (
             <span className="charge-status charge-status--pending">Pendente</span>
           )}
-        </div>
       </div>
       <p className="stat-value mt-3 break-words text-[2rem] leading-9 [overflow-wrap:anywhere]">
         {formatCurrency(props.amount)}
